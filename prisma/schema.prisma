@@ -1,0 +1,248 @@
+// ──────────────────────────────────────────────
+// Prisma Schema — Library Management System
+// ──────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Enums ──────────────────────────────────────
+
+enum Role {
+  READER
+  LIBRARIAN
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum BookCopyStatus {
+  AVAILABLE
+  RESERVED
+  BORROWED
+  DAMAGED
+  LOST
+}
+
+enum BorrowStatus {
+  RESERVED
+  BORROWED
+  RETURNED
+  CANCELLED
+  OVERDUE
+}
+
+enum BorrowItemStatus {
+  BORROWED
+  RETURNED
+  LOST
+  DAMAGED
+}
+
+enum FineType {
+  OVERDUE
+  DAMAGE
+  LOSS
+}
+
+enum FineStatus {
+  UNPAID
+  PAID
+  WAIVED
+}
+
+// ── Models ─────────────────────────────────────
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  firstName String     @map("first_name")
+  lastName  String     @map("last_name")
+  phone     String?
+  role      Role       @default(READER)
+  status    UserStatus @default(ACTIVE)
+  avatarUrl String?    @map("avatar_url")
+  qrCode    String?    @unique @map("qr_code")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  borrowRecords    BorrowRecord[] @relation("ReaderBorrows")
+  processedRecords BorrowRecord[] @relation("LibrarianProcesses")
+  fines            Fine[]
+  auditLogs        AuditLog[]
+
+  @@index([email])
+  @@index([role, status])
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  books Book[]
+
+  @@map("categories")
+}
+
+model Book {
+  id              String   @id @default(cuid())
+  isbn            String   @unique
+  title           String
+  author          String
+  publisher       String?
+  publishedYear   Int?     @map("published_year")
+  description     String?
+  coverImageUrl   String?  @map("cover_image_url")
+  price           Float    @default(0)
+  totalCopies     Int      @default(0) @map("total_copies")
+  availableCopies Int      @default(0) @map("available_copies")
+  categoryId      String   @map("category_id")
+  isDeleted       Boolean  @default(false) @map("is_deleted")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  category Category   @relation(fields: [categoryId], references: [id])
+  copies   BookCopy[]
+
+  @@index([title])
+  @@index([author])
+  @@index([isbn])
+  @@index([categoryId])
+  @@map("books")
+}
+model BookCopy {
+  id            String         @id @default(cuid())
+  barcode       String         @unique
+  bookId        String         @map("book_id")
+  shelfLocation String?        @map("shelf_location")
+  status        BookCopyStatus @default(AVAILABLE)
+  condition     String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  book        Book         @relation(fields: [bookId], references: [id])
+  borrowItems BorrowItem[]
+
+  @@index([barcode])
+  @@index([bookId])
+  @@index([status])
+  @@map("book_copies")
+}
+
+model BorrowRecord {
+  id          String       @id @default(cuid())
+  userId      String       @map("user_id")
+  librarianId String?      @map("librarian_id")
+  status      BorrowStatus @default(RESERVED)
+  borrowDate  DateTime?    @map("borrow_date")
+  dueDate     DateTime?    @map("due_date")
+  returnDate  DateTime?    @map("return_date")
+  renewCount  Int          @default(0) @map("renew_count")
+  notes       String?
+  expiresAt   DateTime?    @map("expires_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  user      User         @relation("ReaderBorrows", fields: [userId], references: [id])
+  librarian User?        @relation("LibrarianProcesses", fields: [librarianId], references: [id])
+  items     BorrowItem[]
+  fines     Fine[]
+
+  @@index([userId])
+  @@index([librarianId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("borrow_records")
+}
+
+model BorrowItem {
+  id              String           @id @default(cuid())
+  borrowRecordId  String           @map("borrow_record_id")
+  bookCopyId      String           @map("book_copy_id")
+  status          BorrowItemStatus @default(BORROWED)
+  returnDate      DateTime?        @map("return_date")
+  returnCondition String?          @map("return_condition")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  borrowRecord BorrowRecord @relation(fields: [borrowRecordId], references: [id])
+  bookCopy     BookCopy     @relation(fields: [bookCopyId], references: [id])
+
+  @@unique([borrowRecordId, bookCopyId])
+  @@index([borrowRecordId])
+  @@index([bookCopyId])
+  @@map("borrow_items")
+}
+
+model Fine {
+  id             String     @id @default(cuid())
+  userId         String     @map("user_id")
+  borrowRecordId String?    @map("borrow_record_id")
+  type           FineType
+  status         FineStatus @default(UNPAID)
+  amount         Float
+  paidAmount     Float      @default(0) @map("paid_amount")
+  reason         String?
+  paidAt         DateTime?  @map("paid_at")
+  paymentMethod  String?    @map("payment_method")
+  waivedBy       String?    @map("waived_by")
+  waivedReason   String?    @map("waived_reason")
+  waivedAt       DateTime?  @map("waived_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id])
+  borrowRecord BorrowRecord? @relation(fields: [borrowRecordId], references: [id])
+
+  @@index([userId])
+  @@index([borrowRecordId])
+  @@index([status])
+  @@map("fines")
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  dataType    String   @default("string") @map("data_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?  @map("actor_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   Json?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+
