@@ -14,9 +14,10 @@
 5. [Quy tắc nghiệp vụ cốt lõi (Business Rules)](#-5-quy-tắc-nghiệp-vụ-cốt-lõi-business-rules)
 6. [Cấu trúc thư mục dự án (Full-Stack)](#-6-cấu-trúc-thư-mục-dự-án-full-stack)
 7. [Hướng dẫn cài đặt & Khởi chạy](#-7-hướng-dẫn-cài-đặt--khởi-chạy)
-8. [Tài khoản & Dữ liệu mẫu (Seed Data)](#-8-tài-khoản--dữ-liệu-mẫu-seed-data)
-9. [Tài liệu API (RESTful API Reference)](#-9-tài-liệu-api-restful-api-reference)
-10. [Kiểm thử & Triển khai đám mây (Cloud Deployment)](#-10-kiểm-thử--triển-khai-đám-mây-cloud-deployment)
+8. [Làm việc nhóm & Đồng bộ Cơ sở dữ liệu (Database Sync)](#-8-làm-việc-nhóm--đồng-bộ-cơ-sở-dữ-liệu-database-sync)
+9. [Hướng dẫn sử dụng hệ thống & Tài khoản mẫu](#-9-hướng-dẫn-sử-dụng-hệ-thống--tài-khoản-mẫu)
+10. [Tài liệu API (RESTful API Reference)](#-10-tài-liệu-api-restful-api-reference)
+11. [Kiểm thử & Triển khai đám mây (Cloud Deployment)](#-11-kiểm-thử--triển-khai-đám-mây-cloud-deployment)
 
 ---
 
@@ -367,18 +368,98 @@ npm run db:studio
 
 ---
 
-## 🔑 8. Tài khoản & Dữ liệu mẫu (Seed Data)
+## 🤝 8. Làm việc nhóm & Đồng bộ Cơ sở dữ liệu (Database Sync)
 
-Sau khi chạy `npm run db:seed`, bạn có thể sử dụng ngay các tài khoản và mã vạch dưới đây để kiểm thử toàn bộ luồng nghiệp vụ:
+Để tất cả thành viên trong nhóm đều chạy được dự án ngay lập tức và **đồng bộ dữ liệu Database 100% theo thời gian thực** (người này thêm sách, đặt mượn hoặc tạo phiếu phạt thì người kia thấy ngay), dự án sử dụng mô hình **Shared Cloud Database trên [Neon PostgreSQL](https://neon.tech)**.
 
-### Tài khoản thử nghiệm
-| Vai trò (Role) | Email đăng nhập | Mật khẩu | Mã định danh QR (`qrCode`) |
-|---|---|---|---|
-| **Quản trị viên (`ADMIN`)** | `admin@library.com` | `Admin@123` | `ADMIN-QR-001` |
-| **Thủ thư (`LIBRARIAN`)** | `librarian@library.com` | `Librarian@123` | `LIBRARIAN-QR-001` |
-| **Độc giả (`READER`)** | `reader@library.com` | `Reader@123` | `READER-QR-001` |
+### 🌐 Bước 1: Trưởng nhóm (Leader) khởi tạo Cloud Database chung (Chỉ làm 1 lần duy nhất)
 
-### Dữ liệu Sách & Mã vạch Bản sao (`Barcode`)
+1. Truy cập [Neon.tech](https://neon.tech), đăng nhập và tạo một Project mới (ví dụ: `library-management`).
+2. Tại màn hình Dashboard của Neon, copy chuỗi kết nối **Connection String** (bật chế độ `Pooled connection`), có dạng:
+   ```env
+   DATABASE_URL="postgresql://neondb_owner:xxxxxx@ep-xxxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+   ```
+3. Dán chuỗi này vào file `.env` trên máy của Leader, sau đó chạy 3 lệnh sau để tạo toàn bộ bảng và nạp dữ liệu mẫu lên Cloud:
+   ```bash
+   npm run db:generate
+   npm run db:migrate
+   npm run db:seed
+   ```
+4. Gửi chuỗi `DATABASE_URL` (hoặc file `.env`) cho các thành viên trong nhóm qua kênh chat nội bộ (**Lưu ý:** Tuyệt đối không commit file `.env` lên GitHub).
+
+---
+
+### 👥 Bước 2: Các thành viên trong nhóm kết nối và chạy dự án
+
+Mỗi thành viên sau khi `git clone` dự án về máy cá nhân **không cần cài đặt PostgreSQL dưới máy**, chỉ cần làm theo 3 bước:
+
+1. Tạo file `.env` tại thư mục gốc (copy từ `.env.example`):
+   ```bash
+   cp .env.example .env
+   ```
+2. Mở file `.env` và dán chuỗi `DATABASE_URL` của Neon Cloud mà Leader đã cung cấp vào.
+3. Mở Terminal và chạy:
+   ```bash
+   # 1. Cài đặt thư viện
+   npm install
+
+   # 2. Sinh Prisma Client khớp với Schema
+   npm run db:generate
+
+   # 3. Khởi chạy Server (Dữ liệu đã có sẵn trên Cloud, dùng được ngay!)
+   npm run dev
+   ```
+
+---
+
+### 🔄 Bước 3: Quy trình đồng bộ khi có thành viên thay đổi cấu trúc bảng (`schema.prisma`)
+
+Khi một thành viên trong nhóm cần thêm bảng hoặc sửa cột trong `prisma/schema.prisma`:
+
+1. **Người sửa Schema:**
+   - Chỉnh sửa file `prisma/schema.prisma`.
+   - Chạy lệnh tạo migration để cập nhật lên Cloud DB:
+     ```bash
+     npx prisma migrate dev --name <ten_thay_doi>
+     ```
+   - Commit và `git push` cả file `prisma/schema.prisma` lẫn thư mục `prisma/migrations/` vừa sinh ra lên GitHub.
+2. **Các thành viên còn lại sau khi `git pull`:**
+   - Chỉ cần chạy lại lệnh sinh Prisma Client để code TypeScript dưới máy nhận diện cột/bảng mới:
+     ```bash
+     npm install
+     npm run db:generate
+     ```
+
+> [!CAUTION]
+> **Quy tắc quan trọng khi cả nhóm dùng chung Cloud Database:**
+> - **KHÔNG tự ý chạy `npm run db:reset` hoặc `npm run db:seed`** khi các thành viên khác đang làm việc, vì script `prisma/seed.ts` có cơ chế làm sạch bảng (`deleteMany`) sẽ xóa mất dữ liệu mà các bạn khác trong nhóm đang test.
+> - Chỉ chạy `npm run db:seed` khi cả nhóm thống nhất muốn **khôi phục lại bộ dữ liệu mẫu ban đầu**.
+
+### 📊 Bảng tóm tắt lệnh nhanh cho các thành viên
+
+| Tình huống | Lệnh cần chạy | Giải thích |
+|---|---|---|
+| **Mới `git clone` dự án về lần đầu** | `npm install` $\rightarrow$ `npm run db:generate` $\rightarrow$ `npm run dev` | Kết nối thẳng vào Cloud DB chung và chạy ngay |
+| **Vừa `git pull` code mới từ nhóm về** | `npm install` $\rightarrow$ `npm run db:generate` | Đồng bộ thư viện và cập nhật kiểu dữ liệu Prisma |
+| **Vừa sửa file `prisma/schema.prisma`** | `npx prisma migrate dev --name <ten_migration>` | Đẩy thay đổi cấu trúc bảng lên Cloud DB và tạo file migration |
+| **Muốn xem/sửa dữ liệu trực quan trên bảng** | `npm run db:studio` | Mở giao diện quản lý dữ liệu tại `http://localhost:5555` |
+
+---
+
+## 🔑 9. Hướng dẫn sử dụng hệ thống & Tài khoản mẫu
+
+### 1. Tài khoản & Dữ liệu mẫu (Seed Data)
+
+Trên Database đã được nạp sẵn bộ tài khoản theo 3 vai trò và các bản sao sách vật lý để mọi thành viên đăng nhập và kiểm thử ngay:
+
+#### Tài khoản thử nghiệm theo phân quyền (RBAC)
+| Vai trò (Role) | Email đăng nhập | Mật khẩu | Mã định danh QR (`qrCode`) | Quyền hạn chính |
+|---|---|---|---|---|
+| **Quản trị viên (`ADMIN`)** | `admin@library.com` | `Admin@123` | `ADMIN-QR-001` | Toàn quyền hệ thống, cấu hình tham số, miễn giảm phạt (`Waive Fine`), xem `AuditLog` |
+| **Thủ thư (`LIBRARIAN`)** | `librarian@library.com` | `Librarian@123` | `LIBRARIAN-QR-001` | Quản lý sách/bản sao, quét QR/Barcode mượn trả tại quầy, thu tiền phạt, xuất báo cáo |
+| **Độc giả (`READER`)** | `reader@library.com` | `Reader@123` | `READER-QR-001` | Tra cứu sách, đặt trước (giữ chỗ 24h), gia hạn sách, xem lịch sử mượn & phí phạt cá nhân |
+
+#### Dữ liệu Sách & Mã vạch Bản sao (`Barcode`)
 | Đầu sách | Mã ISBN | Mã vạch Bản sao (`BookCopy`) | Vị trí kệ (`shelfLocation`) |
 |---|---|---|---|
 | **Clean Code: A Handbook of Agile Software Craftsmanship** | `978-604-1-23456-1` | `BC-CC-001`, `BC-CC-002`, `BC-CC-003` | `IT-A1-01` $\rightarrow$ `IT-A1-03` |
@@ -386,7 +467,58 @@ Sau khi chạy `npm run db:seed`, bạn có thể sử dụng ngay các tài kho
 
 ---
 
-## 📋 9. Tài liệu API (RESTful API Reference)
+### 2. Hướng dẫn luồng sử dụng thực tế (End-to-End Workflow)
+
+#### 📘 Luồng 1: Dành cho Độc giả (`READER`)
+1. **Đăng nhập:** Sử dụng tài khoản `reader@library.com` (`Reader@123`) tại màn hình Login hoặc gọi `POST /api/v1/auth/login` để nhận `accessToken`.
+2. **Tra cứu kho sách:** Tìm kiếm sách theo tên, tác giả, ISBN hoặc lọc theo danh mục tại trang Catalog (`GET /api/v1/books`). Xem số lượng bản sao khả dụng (`availableCopies`) và vị trí kệ (`shelfLocation`).
+3. **Đặt mượn trước trực tuyến (Reservation):**
+   - Chọn cuốn sách còn bản sao `AVAILABLE` và nhấn **Đặt trước** (`POST /api/v1/borrows/reserve`).
+   - Hệ thống tự động khóa 1 bản sao sang trạng thái `RESERVED` và giữ chỗ trong vòng **24 giờ**.
+4. **Gia hạn sách đang mượn:**
+   - Truy cập mục **Sách đang mượn** (`GET /api/v1/borrows/my`), nhấn **Gia hạn** (`POST /api/v1/borrows/:id/renew`) để cộng thêm **7 ngày** (tối đa 2 lần gia hạn nếu chưa quá hạn).
+
+#### 📗 Luồng 2: Dành cho Thủ thư tại quầy giao dịch (`LIBRARIAN`)
+1. **Đăng nhập:** Sử dụng tài khoản `librarian@library.com` (`Librarian@123`).
+2. **Xuất sách cho mượn tại quầy (Counter Checkout):**
+   - Mở màn hình **Quầy Mượn/Trả (Checkout Desk)** hoặc gọi `POST /api/v1/borrows/checkout`.
+   - Quét hoặc nhập mã QR của Độc giả: `READER-QR-001`.
+   - Quét hoặc nhập mã Barcode trên cuốn sách vật lý: ví dụ `BC-CC-001`.
+   - Xác nhận Checkout $\rightarrow$ Trạng thái bản sao chuyển sang `BORROWED`, số lượng `availableCopies` tự động giảm đi 1.
+3. **Nhận sách trả & Tự động tính phạt (Book Return & Fine Engine):**
+   - Khi độc giả mang sách trả, thủ thư quét Barcode hoặc chọn phiếu mượn (`POST /api/v1/borrows/:id/return`).
+   - Chọn tình trạng sách trả về: nguyên vẹn (`GOOD`), hư hỏng nhẹ/nặng (`DAMAGED`) hoặc báo mất (`LOST`).
+   - Nếu trả trễ sau thời gian ân hạn 1 ngày hoặc sách hư hỏng/mất, hệ thống **tự động sinh phiếu phạt (`Fine`)** theo đúng công thức quy định.
+4. **Thu tiền phạt:**
+   - Truy cập danh sách phí phạt (`GET /api/v1/fines`), chọn phiếu phạt `UNPAID` và xác nhận thu tiền (`PATCH /api/v1/fines/:id/settle`).
+
+#### 📕 Luồng 3: Dành cho Quản trị viên (`ADMIN`)
+1. **Đăng nhập:** Sử dụng tài khoản `admin@library.com` (`Admin@123`).
+2. **Phê duyệt miễn giảm phí phạt (`Waive Fine`):**
+   - Với các trường hợp đặc biệt cần miễn phạt, Admin gọi `PATCH /api/v1/fines/:id/waive` kèm theo lý do miễn giảm bắt buộc (`waivedReason`).
+3. **Giám sát & Kiểm toán (`Audit Logs` & `Reports`):**
+   - Xem thống kê tổng quan tại Dashboard (`GET /api/v1/reports/overview`), xuất file báo cáo Excel/PDF.
+   - Tra cứu lịch sử mọi thao tác nhạy cảm (ai đã xóa sách, ai đã miễn phạt, vào thời gian nào, IP nào) tại `GET /api/v1/audit-logs`.
+
+---
+
+### 3. Hướng dẫn kiểm thử nhanh API (Postman / Thunder Client / cURL)
+
+Khi kiểm thử các API yêu cầu xác thực (`Authenticated`), thực hiện theo 2 bước:
+1. Gọi API Đăng nhập để lấy `accessToken`:
+   ```bash
+   curl -X POST http://localhost:3000/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email": "admin@library.com", "password": "Admin@123"}'
+   ```
+2. Copy giá trị `data.accessToken` từ JSON phản hồi và truyền vào Header `Authorization` của các request tiếp theo:
+   ```http
+   Authorization: Bearer <accessToken_của_bạn>
+   ```
+
+---
+
+## 📋 10. Tài liệu API (RESTful API Reference)
 
 ### Chuẩn định dạng Phản hồi (Standard Response Contract)
 Tất cả API đều trả về cấu trúc JSON đồng nhất:
@@ -448,7 +580,7 @@ Tất cả API đều trả về cấu trúc JSON đồng nhất:
 
 ---
 
-## 🚀 10. Kiểm thử & Triển khai đám mây (Cloud Deployment)
+## 🚀 11. Kiểm thử & Triển khai đám mây (Cloud Deployment)
 
 ### Kịch bản Kiểm thử Trọng tâm (Acceptance & Concurrency Testing)
 1. **Chống Race Condition khi mượn bản sao cuối:** Khi chỉ còn `1` bản sao `AVAILABLE`, nếu 2 yêu cầu Checkout diễn ra đồng thời, chỉ `1` giao dịch thành công và giao dịch còn lại nhận mã `HTTP 409 Conflict`, đảm bảo `availableCopies` không bao giờ âm.
