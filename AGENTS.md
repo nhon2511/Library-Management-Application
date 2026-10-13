@@ -20,6 +20,20 @@
 - `src/utils/`: lỗi API, response chuẩn hóa, logger, async handler và constants.
 - `prisma/seed.ts`: dữ liệu seed; không đặt logic domain mới trong file này.
 
+## Skill nội bộ
+
+Các skill dự án nằm trong `.agents/skills/` và bổ sung quy trình chuyên biệt cho agent:
+
+- `backend-review`: review kiến trúc, TypeScript, validation, lỗi và chất lượng backend.
+- `api-feature`: thêm hoặc sửa endpoint theo module, schema, controller và service.
+- `prisma-workflow`: thay đổi Prisma schema, migration, query và seed an toàn.
+- `security-review`: kiểm tra auth, RBAC, secrets, data exposure và các lỗi bảo mật backend.
+- `testing`: thiết kế/bổ sung test; lưu ý hiện dự án chưa có test runner.
+- `bug-fix`: tái hiện, tìm nguyên nhân, sửa lỗi tối thiểu và kiểm tra regression.
+- `release-check`: kiểm tra build, lint, format, Prisma, cấu hình và diff trước merge/deploy.
+
+Khi task phù hợp với một skill, đọc `SKILL.md` tương ứng trước khi thực hiện. Skill không thay thế các quy tắc chung trong file này.
+
 ## Quy trình xử lý request
 
 Route nhận request và áp dụng middleware theo thứ tự phù hợp (thường là `authenticate`, `authorize`, `validate`), sau đó gọi controller. Controller nên mỏng, dùng `asyncHandler`, lấy input từ request và trả response qua `ApiResponse`. Business logic và truy vấn Prisma đặt trong service. Lỗi nghiệp vụ dùng các lớp trong `src/utils/api-error.ts` để được `errorHandler` chuyển thành response thống nhất.
