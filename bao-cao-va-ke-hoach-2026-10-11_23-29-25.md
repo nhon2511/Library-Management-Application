@@ -1,59 +1,118 @@
-﻿# Báo cáo Tiến độ & Kế hoạch Chi tiết Dự án Library Management System
+# Báo cáo tiến độ & kế hoạch dự án Library Management System
 
-*Ngày xuất báo cáo:* 11/10/2026 23:29:25
-
----
-
-## 1. Báo cáo Tiến độ Đã hoàn thành (Done)
-
-Toàn bộ Backend Core & Production-Ready Architecture đã hoàn thiện và kiểm thử thành công trên Cloud Database (**Neon PostgreSQL**):
-- **Modular Architecture:** Chia tách rõ ràng các module (uth, user, category, ook, ook-copy, orrow, ine, eport, udit-log).
-- **Tech Stack:** Node.js, TypeScript, Express.js, Prisma ORM (v7), PostgreSQL (Neon), Zod, JWT.
-- **Bảo mật & Tiện ích:** Rate Limiter, Helmet, CORS, Global Error Handler, Zod Validation, RBAC (READER, LIBRARIAN, ADMIN).
-- **Nghiệp vụ cốt lõi:** Đăng nhập/Đăng ký (Access + Refresh Token qua HttpOnly Cookie), Quản lý danh mục, Sách, Bản sao & Barcode (LIB-...), Quy trình mượn/trả/gia hạn sách, Tính toán tiền phạt tự động, Quản lý thanh toán/miễn giảm phạt, Báo cáo thống kê Dashboard, và API Root (/api/v1).
+*Ngày cập nhật:* 01/11/2026
 
 ---
 
-## 2. Kế hoạch Phát triển Chi tiết (1.5 tháng tới / 6 tuần)
+## 1. Tổng quan tiến độ
 
-### 🟢 Giai đoạn 1: Xây dựng giao diện Frontend (Tuần 1 & Tuần 2)
-**Công nghệ đề xuất:** React.js (Vite) / Next.js, Tailwind CSS, Lucide Icons, React Hook Form + Zod.
+Backend core và frontend MVP đã được xây dựng trong cùng workspace. Backend dùng Node.js, TypeScript, Express, Prisma và PostgreSQL; frontend dùng React, Vite, TypeScript và Tailwind CSS.
 
-#### Tuần 1: Khung giao diện & Module Xác thực (Auth) & Độc giả (Reader View)
-- [ ] Khởi tạo dự án Frontend, cấu hình Tailwind CSS, Router, và Axios Client.
-- [ ] Giao diện Đăng nhập (/login) và Đăng ký tài khoản (/register) khớp với Zod schema.
-- [ ] Giao diện Reader Dashboard: Tra cứu Catalog sách (tìm kiếm, lọc danh mục, phân trang), chi tiết sách, lịch sử mượn cá nhân (/my-borrows), và danh sách tiền phạt (/fines).
-
-#### Tuần 2: Giao diện Quản trị & Thủ thư (Librarian / Admin Dashboard)
-- [ ] Thiết lập Protected Routes phân quyền theo Role (ADMIN, LIBRARIAN, READER).
-- [ ] Quản lý danh mục & Catalog sách (Thêm, sửa, xóa, thêm bản sao và vị trí kệ).
-- [ ] Giao diện Checkout & Return Desk: Thủ thư quét/nhập Barcode để cho mượn và trả sách (tự động hiển thị tiền phạt).
-- [ ] Quản lý thu tiền phạt (Settle) và miễn giảm phạt (Waive).
-- [ ] Trang Dashboard thống kê tổng quan (Recharts / Chart.js) và Audit Logs dành cho Admin.
+Trạng thái hiện tại: **Backend core hoàn thành; Frontend MVP đã tích hợp các API hiện có; một số luồng cần endpoint backend bổ sung trước khi hoàn thiện đầy đủ.**
 
 ---
 
-### 🟡 Giai đoạn 2: Tích hợp hệ thống & Tính năng nâng cao (Tuần 3 & Tuần 4)
+## 2. Hạng mục đã hoàn thành
 
-#### Tuần 3: Tích hợp API & Quản lý Token (State Management)
-- [ ] Cấu hình Axios Interceptors: Tự động đính kèm Bearer Token và tự động gọi API /api/v1/auth/refresh khi token hết hạn (401).
-- [ ] Kết nối hoàn chỉnh các form tạo/sửa/xóa với backend kèm Toast notifications.
-- [ ] Tích hợp quét Barcode/QR Code qua camera (html5-qrcode) hoặc máy quét USB cầm tay.
+### 2.1 Backend
 
-#### Tuần 4: Tính năng bổ trợ & Trải nghiệm người dùng (UX Optimization)
-- [ ] Tích hợp **Nodemailer / Resend** ở Backend để gửi email xác nhận đặt sách và nhắc nhở hạn trả.
-- [ ] Tự động sinh mã QR đại diện cho mã định danh người dùng hiển thị trên Profile để thủ thư quét nhanh.
-- [ ] Tối ưu hóa UI/UX: Skeleton Loading, Responsive trên mọi thiết bị.
+- Modular architecture cho các module auth, user, category, book, book-copy, borrow, fine, report và audit-log.
+- REST API với prefix `/api/v1` và response contract gồm `success`, `statusCode`, `message`, `data`, `pagination`.
+- Authentication với access token, refresh token qua HttpOnly cookie và logout.
+- RBAC cho `READER`, `LIBRARIAN` và `ADMIN`.
+- Zod validation, rate limiter, Helmet, CORS và global error handler.
+- Quản lý category, book, book copy và barcode.
+- Reserve, checkout, return, renew và tính fine theo trạng thái/tình trạng bản sao.
+- Settle fine cho Librarian/Admin, waive fine có lý do cho Admin và audit log cho thao tác miễn phạt.
+- Report overview và audit log API.
+
+### 2.2 Frontend
+
+Frontend nằm trong thư mục `frontend/` và chạy độc lập bằng Vite.
+
+- Auth flow: `/login`, `/register`, protected routes và role-based routes.
+- Axios client tập trung, đọc `VITE_API_URL`, gửi credentials và tự refresh access token khi API trả 401.
+- Reader flows:
+  - `/reader/dashboard`
+  - `/catalog`
+  - `/books/:id`
+  - `/reader/my-borrows`
+  - `/reader/fines`
+  - `/profile`
+- Librarian/Admin flows:
+  - `/operations`
+  - `/manage/books`
+  - `/manage/books/:id/copies`
+  - `/manage/categories`
+  - `/desk/checkout`
+  - `/desk/return`
+  - `/manage/fines`
+  - `/reports`
+  - `/audit-logs` cho Admin
+- Có loading skeleton, empty state, filtered-empty state, error/retry state, permission state và success/error feedback.
+- Checkout thủ công hỗ trợ tối đa 5 barcode mỗi phiên và chặn barcode trùng trong cùng phiên.
+- UI responsive cho desktop/mobile, visible focus, label đầy đủ và hỗ trợ `prefers-reduced-motion`.
+- Design direction được ghi tại `frontend/DESIGN.md`, theo hướng “quiet academic library”.
+- Không sử dụng dữ liệu giả cho KPI, bảng hoặc biểu đồ.
 
 ---
 
-### 🟠 Giai đoạn 3: Kiểm thử, Deployment & Báo cáo đồ án (Tuần 5 & Tuần 6)
+## 3. Kiểm tra đã thực hiện
 
-#### Tuần 5: Kiểm thử toàn diện (Testing) & Sửa lỗi (Bug Fixing)
-- [ ] Viết Unit & Integration Tests (Jest & Supertest) cho quy trình mượn trả, tính tiền phạt và phân quyền API.
-- [ ] Kiểm thử End-to-End (E2E) từ góc nhìn Reader -> Librarian -> Admin.
-- [ ] Rà soát lỗi, tối ưu truy vấn Prisma và bảo mật.
+Trong thư mục `frontend/` đã chạy thành công:
 
-#### Tuần 6: Triển khai sản phẩm (Cloud Deployment) & Hoàn thiện tài liệu
-- [ ] **Cloud Deployment:** Database trên **Neon** (đã sẵn sàng), Backend lên **Render/Railway**, Frontend lên **Vercel/Netlify**.
-- [ ] **Tài liệu đồ án:** Vẽ sơ đồ ERD, Sequence Diagram luồng nghiệp vụ, soạn thảo slide thuyết trình và chuẩn bị kịch bản demo bảo vệ đồ án.
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
+
+Đã kiểm tra rendered catalog ở dev server. Khi backend chưa chạy, giao diện hiển thị error/retry state thay vì tự tạo dữ liệu mẫu.
+
+---
+
+## 4. API mismatch và phần cần bổ sung
+
+- Return desk chưa thể hoàn thiện lookup flow vì backend hiện chưa có endpoint tìm borrow record theo barcode hoặc endpoint lấy chi tiết phiếu mượn theo id.
+- `/reports/overview` hiện chỉ trả về số tổng quan; chưa đủ dữ liệu cho top sách, overdue theo category và doanh thu fine. Frontend chỉ hiển thị các chỉ số API thực sự trả về.
+- Chưa có endpoint export Excel/PDF.
+- Camera QR/barcode chưa được bật vì backend chưa có scanner/session contract; checkout hiện hỗ trợ nhập mã thủ công.
+- QR định danh người dùng chỉ hiển thị trạng thái/mã API trả về; backend chưa có endpoint sinh QR riêng.
+
+Các phần trên không được frontend tự bịa endpoint hoặc dữ liệu. Cần thống nhất contract backend trước khi triển khai tiếp.
+
+---
+
+## 5. Kế hoạch tiếp theo
+
+### Tuần 1 — Hoàn thiện tích hợp
+
+- [ ] Bổ sung endpoint lookup borrow record cho return desk.
+- [ ] Bổ sung response fine phát sinh sau return nếu cần hiển thị chi tiết hơn.
+- [ ] Bổ sung endpoint report chi tiết và export nếu yêu cầu demo.
+- [ ] Xác nhận contract sinh QR và scanner.
+
+### Tuần 2 — Kiểm thử
+
+- [ ] Unit/integration tests cho auth, RBAC, borrow, return và fine.
+- [ ] E2E test cho Reader → Librarian → Admin.
+- [ ] Kiểm tra responsive ở viewport mobile, tablet và desktop.
+- [ ] Rà soát accessibility và error states.
+
+### Tuần 3 — Deployment và tài liệu
+
+- [ ] Deploy backend và frontend lên môi trường demo.
+- [ ] Kiểm tra CORS, cookie, refresh token và biến môi trường production.
+- [ ] Hoàn thiện ERD, sequence diagram, slide và kịch bản demo.
+
+---
+
+## 6. Cách chạy frontend local
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Mặc định frontend chạy tại `http://localhost:5173`. API có thể cấu hình bằng biến môi trường `VITE_API_URL`, mặc định là `http://localhost:3000/api/v1`.
