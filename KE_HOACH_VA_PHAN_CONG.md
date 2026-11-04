@@ -2,10 +2,8 @@
 ## HỆ THỐNG QUẢN LÝ THƯ VIỆN (LIBRARY MANAGEMENT SYSTEM - LMS)
 
 > **Thông tin tổng quan:**  
-> - **Thời gian thực hiện dự kiến:** 3 - 4 tuần  
-> - **Quy mô nhân sự:** Nhóm 4 người  
-> - **Mô hình triển khai:** Node.js 20 LTS (Local) + Neon PostgreSQL + Render (Backend) + Vercel (Frontend) *(Không dùng Docker)*  
-> - **Ngày lập kế hoạch:** 02/11/2026  
+> - **Mô hình triển khai:** Nhóm 4 người — Node.js 20 LTS (Local) + Neon PostgreSQL + Render (Backend) + Vercel (Frontend) *(Không dùng Docker)*  
+> - **Nguyên tắc thực hiện:** Phân công theo đầu việc cụ thể (Task-Driven), làm việc độc lập song song 100% (không ai phải chờ ai), tập trung hoàn thiện toàn diện sản phẩm sẵn sàng cho buổi Demo nghiệm thu.  
 
 ---
 
@@ -76,143 +74,236 @@ Giao diện SPA tuân theo ngôn ngữ thiết kế **“Quiet Academic Library�
 
 ---
 
-## PHẦN 2: KẾ HOẠCH & PHÂN CÔNG CHI TIẾT CHO NHÓM 4 NGƯỜI (3 - 4 TUẦN)
+## PHẦN 2: BẢNG PHÂN CÔNG CHI TIẾT TỪNG ĐẦU VIỆC CẦN LÀM
 
-### 1. Phân định vai trò và trách nhiệm (RACI)
+### 🔴 MEMBER 1: TECH LEAD & AUTOMATION / CLOUD DEPLOYMENT
 
-| Thành viên | Vai trò | Trách nhiệm chính |
-|---|---|---|
-| **Member 1** | **Tech Lead & Backend Automation** | Cấu hình Background Cron jobs, Dịch vụ Email tự động, CRUD tham số `SystemSetting`, Deploy Backend lên Render và Quản lý tích hợp Git. |
-| **Member 2** | **Backend Business & Data Services** | Xây dựng API Lookup cho quầy mượn/trả, Báo cáo thống kê chuyên sâu, Xuất file Excel/PDF, Tích hợp Upload ảnh bìa sách Cloudinary. |
-| **Member 3** | **Frontend Lead & Scanner Specialist** | Tích hợp Camera QR/Barcode Scanner (`html5-qrcode`), Dashboard biểu đồ Recharts, Màn hình Admin (Quản lý Users & Cấu hình Settings). |
-| **Member 4** | **QA / Full-Stack & Documentation** | Xây dựng bộ kiểm thử tự động (Jest + Supertest), Viết test chống Race Condition, Kiểm thử E2E liên thông, Soạn báo cáo đồ án, Slide & Kịch bản demo. |
+#### Việc 1.1: Tự động hóa hủy phiếu đặt mượn sau 24h
+* **Mục tiêu:** Xử lý việc độc giả đặt sách giữ chỗ nhưng quá 24h không đến lấy thì tự động hủy và trả lại sách về kho khả dụng.
+* **File cần tạo:** `src/jobs/reservation-cleanup.job.ts`
+* **Thư viện cài đặt:** `npm install node-cron @types/node-cron`
+* **Checklist hoàn thành:**
+  - [ ] Viết hàm quét các phiếu trong bảng `borrow_records` có `status = 'RESERVED'` và `expiresAt < new Date()`.
+  - [ ] Chạy trong Prisma Transaction: Cập nhật trạng thái phiếu sang `CANCELLED`.
+  - [ ] Cập nhật bản sao `BookCopy` về `AVAILABLE`, tăng số lượng `availableCopies` của `Book` lên 1.
+  - [ ] Đặt lịch chạy định kỳ mỗi 15 phút (`*/15 * * * *`).
+  - [ ] Đăng ký khởi chạy job trong `src/server.ts`.
 
----
+#### Việc 1.2: Tự động hóa quét và cập nhật sách quá hạn
+* **Mục tiêu:** Hàng ngày quét các phiếu mượn chưa trả mà đã quá hạn để chuyển trạng thái sang `OVERDUE`.
+* **File cần tạo:** `src/jobs/overdue-check.job.ts`
+* **Checklist hoàn thành:**
+  - [ ] Viết hàm quét các phiếu mượn có `status = 'BORROWED'` và `dueDate < new Date()`.
+  - [ ] Cập nhật trạng thái phiếu sang `OVERDUE`.
+  - [ ] Đặt lịch chạy lúc 00:00 hàng ngày (`0 0 * * *`).
+  - [ ] Đăng ký khởi chạy job trong `src/server.ts`.
 
-### 2. Lộ trình triển khai chi tiết theo tuần
+#### Việc 1.3: Dịch vụ gửi Email thông báo mượn sách & nhắc hạn
+* **Mục tiêu:** Gửi email xác nhận khi checkout mượn sách thành công và gửi email nhắc nhở trước 1–2 ngày khi tới hạn trả.
+* **File cần tạo:** `src/services/email.service.ts`
+* **Thư viện cài đặt:** `npm install nodemailer @types/nodemailer`
+* **Checklist hoàn thành:**
+  - [ ] Cấu hình transporter gửi mail (dùng tài khoản Ethereal test hoặc Gmail App Password / Resend API).
+  - [ ] Thiết kế mẫu email HTML: Lời chào độc giả, danh sách các cuốn sách đã mượn kèm ngày hẹn trả.
+  - [ ] Gọi hàm gửi email trong `src/modules/borrow/borrow.service.ts` ngay sau khi checkout thành công.
+  - [ ] Viết cron job chạy 08:00 sáng quét các phiếu mượn còn 1–2 ngày đến hạn để gửi email nhắc nhở độc giả.
 
-#### 🗓️ TUẦN 1: Tích hợp Camera Scanner, Dịch vụ Email & Cron Jobs
-*Mục tiêu:* Đưa camera vào quét thực tế tại quầy, kích hoạt thông báo email và tự động hóa xử lý đơn đặt quá hạn.
-
-- **Member 1 (Tech Lead / Automation):**
-  - Cài đặt `node-cron`. Viết cron job tự động quét định kỳ: Hủy phiếu `RESERVED` sau 24h và hoàn trả bản sao về kho `AVAILABLE`.
-  - Viết cron job hàng ngày (0h00) quét và cập nhật trạng thái phiếu quá hạn thành `OVERDUE`.
-  - Cài đặt `nodemailer` (hoặc `resend` SDK sandbox) để gửi email chào mừng và email xác nhận khi checkout mượn sách thành công.
-- **Member 2 (Backend Data Services):**
-  - Viết API tra cứu tức thời cho quầy: `GET /api/v1/borrows/lookup?barcode=...` và `GET /api/v1/users/lookup?qrCode=...` để thủ thư tra nhanh phiếu mượn/độc giả.
-  - Viết API sinh mã base64 QR Code cho User và Barcode cho sách.
-  - Tích hợp upload ảnh bìa sách lên Cloudinary qua API (`multer-storage-cloudinary`).
-- **Member 3 (Frontend Lead):**
-  - Cài đặt `html5-qrcode`. Tạo Component dùng chung `<CameraScanner />` hỗ trợ cả webcam máy tính và camera điện thoại.
-  - Tích hợp camera scanner vào quầy Checkout: Quét mã QR thẻ độc giả và quét liên tiếp các barcode sách.
-  - Tích hợp camera scanner vào quầy Return: Quét mã vạch trên sách để tự động hiển thị phiếu mượn tương ứng.
-- **Member 4 (QA & Testing):**
-  - Thiết lập môi trường test với `jest`, `ts-jest`, `@types/jest`, `supertest`. Thêm lệnh `npm test`.
-  - Viết Unit/Integration tests cho module `auth` (Đăng ký, Đăng nhập, Sai mật khẩu, Phân quyền RBAC).
-  - Viết tests cho module `category` và `book` (Validation, CRUD, Soft-delete).
-
----
-
-#### 🗓️ TUẦN 2: Báo cáo nâng cao, Xuất file Excel/PDF & Quản trị Admin
-*Mục tiêu:* Trực quan hóa dữ liệu thống kê qua biểu đồ, xuất báo cáo file và hoàn thiện chức năng quản trị tài khoản/cấu hình.
-
-- **Member 1 (Tech Lead / Automation):**
-  - Xây dựng module `system-setting`: CRUD các tham số thư viện trong DB (Hạn mức mượn, thời hạn giữ chỗ, mức phạt/ngày, % phạt sách hỏng).
-  - Viết Cron job gửi email nhắc hạn tự động trước 1–2 ngày khi tới hạn trả (`dueDate`).
-  - Viết API quản lý tài khoản cho Admin: `GET /api/v1/users`, `PATCH /api/v1/users/:id/status` (Khóa/Kích hoạt), `PATCH /api/v1/users/:id/role`.
-- **Member 2 (Backend Data Services):**
-  - Nâng cấp `report.service.ts`: API Top 10 sách mượn nhiều nhất, API xu hướng mượn 6 tháng gần nhất, API cơ cấu thể loại sách.
-  - Cài đặt `exceljs`: Viết API `GET /api/v1/reports/export/excel` xuất danh sách sách đang mượn & quá hạn.
-  - Cài đặt `pdfkit`: Viết API `GET /api/v1/borrows/:id/receipt` in phiếu mượn/trả sách định dạng PDF.
-- **Member 3 (Frontend Lead):**
-  - Nâng cấp trang Báo cáo: Tích hợp thư viện `recharts` vẽ biểu đồ cột Top sách, biểu đồ đường lượt mượn theo tháng, biểu đồ tròn cơ cấu sách.
-  - Thêm nút tải file báo cáo Excel và in phiếu mượn PDF.
-  - Xây dựng 2 trang quản trị Admin: Màn hình quản lý danh sách Users và Màn hình cấu hình quy định thư viện (`/admin/settings`).
-- **Member 4 (QA & Testing):**
-  - Viết Integration tests cho module `borrow` và `fine`:
-    - Test tính phạt quá hạn chuẩn xác (5.000đ/ngày, trần 150%).
-    - Test chặn gia hạn khi đã quá 2 lần hoặc sách đã quá hạn.
-  - **Viết test Race Condition (Kiểm thử tranh chấp):** Mô phỏng 2 request gửi đồng thời đặt mượn cuốn sách chỉ còn 1 bản sao khả dụng duy nhất $\rightarrow$ Xác nhận đúng 1 người thành công và 1 người nhận lỗi Conflict (409).
+#### Việc 1.4: Triển khai toàn bộ hệ thống lên Cloud (Render & Vercel)
+* **Mục tiêu:** Đưa hệ thống lên internet chạy online 100%, phục vụ việc cầm điện thoại demo trực tiếp.
+* **Nền tảng:** Render.com (Backend) + Vercel (Frontend) + Neon (PostgreSQL).
+* **Checklist hoàn thành:**
+  - [ ] Tạo Web Service trên **Render.com** (liên kết repo GitHub, build command: `npm install && npm run build`, start command: `npm start`).
+  - [ ] Điền toàn bộ biến môi trường trên Render: `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CORS_ORIGIN`.
+  - [ ] Tạo Project trên **Vercel** cho thư mục `frontend`: Cấu hình `VITE_API_URL` trỏ về domain Render.
+  - [ ] Cấu hình CORS tại `src/app.ts` chấp nhận domain Vercel và cho phép truyền cookie (`credentials: true`).
+  - [ ] Kiểm tra đăng nhập, lưu cookie refresh token mượt mà trên môi trường HTTPS.
 
 ---
 
-#### 🗓️ TUẦN 3: Triển khai Cloud (Render & Vercel), Test E2E & Tinh chỉnh UX
-*Mục tiêu:* Đưa hệ thống lên môi trường online public, kiểm thử liên thông toàn bộ các vai trò và khắc phục triệt để lỗi.
+### 🔵 MEMBER 2: BACKEND BUSINESS & DATA SERVICES
 
-- **Member 1 (Tech Lead / Cloud Deployment):**
-  - Tạo Web Service trên **Render.com** cho Backend (kết nối repo GitHub, thiết lập build `npm run build`, start `npm start`).
-  - Tạo project trên **Vercel** cho Frontend (biến môi trường `VITE_API_URL` trỏ về domain Render).
-  - Cấu hình CORS giữa Vercel $\leftrightarrow$ Render, kiểm tra cookie refresh token hoạt động trơn tru qua giao thức HTTPS.
-  - Thiết lập GitHub Actions CI workflow: Tự động chạy `npm run build` và `npm test` mỗi khi có pull request.
-- **Member 2 (Backend Data Services):**
-  - Rà soát bảo mật & Tối ưu hiệu năng: Kiểm tra các truy vấn Prisma, bổ sung index còn thiếu, đảm bảo không lộ thông tin nhạy cảm.
-  - Viết Swagger/Scalar API Documentation trực quan tại route `/api/v1/docs` để phục vụ hội đồng nghiệm thu.
-- **Member 3 (Frontend Lead):**
-  - Tinh chỉnh Responsive trên điện thoại (đảm bảo thủ thư cầm smartphone quét camera mượt mà, không bị vỡ giao diện).
-  - Thay thế các thông báo `alert` thô bằng Toast notifications đẹp mắt.
-  - Hoàn thiện xử lý lỗi giao diện khi mất kết nối mạng (nút Retry).
-- **Member 4 (QA & Testing):**
-  - Thực hiện kiểm thử toàn diện E2E (End-to-End) theo hành trình thực tế:
-    1. Độc giả đăng ký $\rightarrow$ Tìm kiếm sách $\rightarrow$ Đặt trước sách (Reserve).
-    2. Thủ thư mở camera quét mã QR độc giả $\rightarrow$ Checkout giao sách.
-    3. Độc giả kiểm tra hạn mượn $\rightarrow$ Bấm gia hạn thành công.
-    4. Thủ thư quét mã trả sách $\rightarrow$ Báo hỏng nhẹ $\rightarrow$ Hệ thống tự sinh khoản phạt.
-    5. Thủ thư thu tiền phạt / Admin miễn phạt $\rightarrow$ Kiểm tra nhật ký Audit Log.
-  - Lập bảng tổng hợp Bug để các thành viên fix ngay trong tuần.
+#### Việc 2.1: Xây dựng API Lookup phục vụ quầy mượn / trả
+* **Mục tiêu:** Hỗ trợ quét mã camera: Quét mã barcode trên sách là lập tức tra ra thông tin phiếu mượn tương ứng mà không phải gõ ID thủ công.
+* **File cần sửa/thêm:** `src/modules/borrow/borrow.controller.ts`, `borrow.service.ts`, `borrow.routes.ts`
+* **Checklist hoàn thành:**
+  - [ ] Viết API `GET /api/v1/borrows/lookup?barcode=...`:
+    - Tìm bản sao sách `BookCopy` theo barcode.
+    - Tìm phiếu mượn `BorrowRecord` đang ở trạng thái `BORROWED` có chứa bản sao này.
+    - Trả về thông tin: ID phiếu mượn, tên độc giả, email, ngày mượn, hạn trả, trạng thái quá hạn.
+  - [ ] Viết API `GET /api/v1/users/lookup?qrCode=...`: Tìm độc giả theo mã QR cá nhân để điền nhanh vào quầy Checkout.
 
----
+#### Việc 2.2: API sinh mã Base64 cho QR Code độc giả và Barcode sách
+* **Mục tiêu:** Trả về chuỗi ảnh Base64 để hiển thị mã vạch lên thẻ độc giả hoặc in dán lên gáy sách.
+* **Thư viện cài đặt:** `npm install qrcode @types/qrcode`
+* **Checklist hoàn thành:**
+  - [ ] Viết API `GET /api/v1/users/:id/qrcode`: Sinh ảnh QR Data URL từ chuỗi `user.qrCode`.
+  - [ ] Viết API `GET /api/v1/book-copies/:id/barcode`: Sinh ảnh mã vạch từ chuỗi `barcode`.
 
-#### 🗓️ TUẦN 4: Đóng băng Code, Hoàn thiện Báo cáo & Tổng duyệt Thuyết trình
-*Mục tiêu:* Đóng băng mã nguồn, nạp bộ dữ liệu demo chuẩn đẹp, hoàn thiện tài liệu báo cáo và diễn tập kịch bản demo.
+#### Việc 2.3: Tích hợp Upload ảnh bìa sách Cloudinary
+* **Mục tiêu:** Cho phép upload file ảnh từ máy tính thay vì phải nhập text link URL.
+* **File cần tạo:** `src/middlewares/upload.middleware.ts`
+* **Thư viện cài đặt:** `npm install multer cloudinary multer-storage-cloudinary @types/multer`
+* **Checklist hoàn thành:**
+  - [ ] Đăng ký tài khoản Cloudinary miễn phí, lấy `cloud_name`, `api_key`, `api_secret`.
+  - [ ] Cấu hình storage multer upload ảnh trực tiếp lên Cloudinary.
+  - [ ] Gắn middleware upload vào route `POST /api/v1/books` và `PATCH /api/v1/books/:id`.
+  - [ ] Lưu đường dẫn ảnh trả về vào trường `coverImageUrl` của bảng Book.
 
-- **Cả 4 thành viên (Code Freeze & Nạp Data):**
-  - **Đóng băng mã nguồn (Hết thứ 3):** Ngừng phát triển tính năng mới, chỉ sửa lỗi hiển thị nhỏ.
-  - Nạp bộ dữ liệu mẫu chuẩn (`prisma/seed.ts`) phong phú: Đủ ảnh bìa sách đẹp, các giao dịch đang mượn, quá hạn, đã trả, nợ phạt để dashboard demo sinh động.
-- **Member 1 & Member 2 (Báo cáo kỹ thuật):**
-  - Soạn tài liệu Báo cáo đồ án môn học hoàn chỉnh (Word/PDF):
-    - Đặt vấn đề, phân tích nghiệp vụ (Business Rules).
-    - Thiết kế kiến trúc hệ thống, biểu đồ ERD, sơ đồ Use Case, kiến trúc Cloud.
-    - Chi tiết hiện thực các module trọng tâm (Concurrency, Background Jobs, Fine Engine).
-    - Đánh giá kết quả kiểm thử và hướng phát triển tương lai.
-- **Member 3 & Member 4 (Slide & Kịch bản Demo):**
-  - Thiết kế bộ Slide thuyết trình PowerPoint/Canva chuyên nghiệp (15 - 20 slides, súc tích, nhiều hình ảnh minh họa).
-  - Xây dựng Kịch bản Demo phân vai chi tiết (Người giới thiệu $\rightarrow$ Độc giả $\rightarrow$ Thủ thư tại quầy $\rightarrow$ Quản trị viên).
-  - **Quay 01 Video Clip Demo hoàn chỉnh (5 - 7 phút)** làm phương án dự phòng (Backup) nếu buổi bảo vệ gặp sự cố mạng internet.
-- **Cả nhóm (Tổng duyệt):**
-  - Diễn tập thuyết trình thử ít nhất 2 lần, bấm giờ và chuẩn bị trước các câu hỏi vấn đáp hội đồng thường đặt ra.
+#### Việc 2.4: Bổ sung API Báo cáo thống kê chuyên sâu
+* **Mục tiêu:** Cung cấp dữ liệu thống kê trực quan cho các biểu đồ ở Frontend.
+* **File cần sửa:** `src/modules/report/report.service.ts`, `report.controller.ts`, `report.routes.ts`
+* **Checklist hoàn thành:**
+  - [ ] Viết API `GET /api/v1/reports/top-books`: Thống kê 10 đầu sách có số lượt mượn nhiều nhất.
+  - [ ] Viết API `GET /api/v1/reports/monthly-trends`: Thống kê số lượng mượn và trả theo từng tháng (6 tháng gần nhất).
+  - [ ] Viết API `GET /api/v1/reports/categories-ratio`: Thống kê tỷ lệ phân bổ sách theo từng thể loại.
 
----
-
-### 3. Ma trận phân công nhiệm vụ theo tuần (WBS Matrix)
-
-```
-Tuần 1:
-├── Member 1: Background Jobs (Overdue, Expiry) + Dịch vụ Email (Nodemailer/Resend)
-├── Member 2: Desk Lookup API + Upload ảnh Cloudinary + API QR Base64
-├── Member 3: Camera Scanner Component (html5-qrcode) + Tích hợp Desk Checkout/Return
-└── Member 4: Cấu hình Jest & Supertest + Unit Tests Auth & Catalog
-
-Tuần 2:
-├── Member 1: System Settings API + Cron nhắc hạn trả sách trước 1-2 ngày
-├── Member 2: API Báo cáo phân tích + Xuất file Excel (exceljs) & PDF (pdfkit)
-├── Member 3: Biểu đồ Recharts + Màn hình Admin Quản lý Users & Cấu hình Settings
-└── Member 4: Integration Tests Borrow/Return/Fine + Kiểm thử Race Condition
-
-Tuần 3:
-├── Member 1: Deploy Render & Vercel + Cấu hình CI GitHub Actions + SSL/CORS
-├── Member 2: Tối ưu truy vấn Prisma + Swagger/Scalar API Docs + Rà soát bảo mật
-├── Member 3: Responsive Mobile/Tablet + Toast Notifications + Tinh chỉnh UX
-└── Member 4: Kiểm thử liên thông E2E + Quản lý sửa lỗi toàn diện
-
-Tuần 4:
-├── Member 1 & 2: Soạn thảo Báo cáo đồ án môn học hoàn chỉnh (Word/PDF)
-├── Member 3 & 4: Thiết kế Slide báo cáo + Kịch bản Demo + Video clip backup
-└── Cả nhóm: Code Freeze + Nạp dữ liệu Seed chuẩn + Tổng duyệt Thuyết trình
-```
+#### Việc 2.5: Xuất dữ liệu báo cáo ra file Excel
+* **Mục tiêu:** Bấm nút là tải về file Excel danh sách phiếu mượn và danh sách sách quá hạn.
+* **Thư viện cài đặt:** `npm install exceljs`
+* **Route:** `GET /api/v1/reports/export/excel`
+* **Checklist hoàn thành:**
+  - [ ] Tạo Workbook và Worksheet bằng `exceljs`.
+  - [ ] Thêm các cột: STT, Mã phiếu, Tên độc giả, Tên sách, Barcode, Ngày mượn, Ngày hẹn trả, Trạng thái.
+  - [ ] Định dạng bảng tính: Chữ in đậm tiêu đề, kẻ viền ô, tô màu header, tự động căn chỉnh độ rộng cột.
+  - [ ] Xuất stream trả về dạng file `.xlsx` cho trình duyệt tải xuống.
 
 ---
 
-### 4. HƯỚNG DẪN QUY TRÌNH GIT CHI TIẾT DÀNH CHO TỪNG THÀNH VIÊN
+### 🟢 MEMBER 3: FRONTEND LEAD & SCANNER SPECIALIST
+
+#### Việc 3.1: Xây dựng Component Camera Scanner dùng chung
+* **Mục tiêu:** Mở camera máy tính hoặc camera sau điện thoại để quét mã vạch và QR code.
+* **File cần tạo:** `frontend/src/components/scanner.tsx`
+* **Thư viện cài đặt:** `cd frontend && npm install html5-qrcode`
+* **Checklist hoàn thành:**
+  - [ ] Tạo Component `<CameraScanner onScan={(resultText) => void} onClose={() => void} />`.
+  - [ ] Khởi tạo đối tượng `Html5QrcodeScanner`.
+  - [ ] Cấu hình quét cả mã QR và mã Barcode 1D (Code128, EAN13).
+  - [ ] Bắt sự kiện quét thành công và trả về chuỗi text mã vạch.
+
+#### Việc 3.2: Tích hợp Camera Scanner vào Quầy Checkout (Mượn sách)
+* **File cần sửa:** `frontend/src/pages/operations.tsx` (`CheckoutPage`)
+* **Checklist hoàn thành:**
+  - [ ] Thêm nút icon Camera cạnh ô "Mã độc giả": Bấm vào mở modal camera $\rightarrow$ quét mã QR thẻ độc giả $\rightarrow$ tự điền mã vào ô.
+  - [ ] Thêm nút icon Camera tại danh sách "Barcode sách": Cho phép quét liên tục nhiều cuốn sách.
+  - [ ] Tự động kiểm tra trùng lặp barcode và giới hạn tối đa 5 cuốn mỗi phiên.
+
+#### Việc 3.3: Tích hợp Camera Scanner vào Quầy Return (Trả sách)
+* **File cần sửa:** `frontend/src/pages/operations.tsx` (`ReturnPage`)
+* **Checklist hoàn thành:**
+  - [ ] Thêm nút bật camera quét mã vạch trên cuốn sách mang đến trả.
+  - [ ] Khi quét được mã barcode $\rightarrow$ tự động gọi API lookup của Member 2.
+  - [ ] Tự động hiển thị chi tiết phiếu mượn, tên người mượn, số ngày trễ (nếu có).
+  - [ ] Hiển thị lựa chọn đánh giá tình trạng sách: *Bình thường, Hỏng nhẹ, Hỏng nặng, Bị mất*.
+  - [ ] Bấm xác nhận trả sách và hiển thị số tiền phạt tự động sinh ra (nếu có).
+
+#### Việc 3.4: Nâng cấp Dashboard Báo cáo với biểu đồ Recharts
+* **File cần sửa:** `frontend/src/pages/operations.tsx` (`ReportsPage`)
+* **Thư viện cài đặt:** `cd frontend && npm install recharts`
+* **Checklist hoàn thành:**
+  - [ ] Tích hợp `BarChart`: Hiển thị Top 10 cuốn sách được mượn nhiều nhất.
+  - [ ] Tích hợp `LineChart` / `AreaChart`: Thể hiện số lượt mượn/trả theo từng tháng.
+  - [ ] Tích hợp `PieChart`: Cơ cấu tỷ lệ sách theo các thể loại.
+  - [ ] Thêm nút bấm "Tải báo cáo Excel" kết nối với API của Member 2.
+
+#### Việc 3.5: Tinh chỉnh Responsive Mobile & Toast Notifications
+* **Checklist hoàn thành:**
+  - [ ] Kiểm tra và chỉnh sửa CSS trên màn hình điện thoại (đảm bảo lúc demo cầm smartphone mở quầy quét mã không bị vỡ giao diện).
+  - [ ] Cài đặt thư viện Toast thông báo (hoặc popup nhẹ) thay cho các lệnh `alert()` thông thường.
+  - [ ] Xử lý hiển thị thông báo lỗi khi mất mạng kèm nút "Thử lại".
+
+---
+
+### 🟣 MEMBER 4: QA / TESTING & DEMO MASTER
+
+#### Việc 4.1: Thiết lập môi trường kiểm thử tự động với Jest & Supertest
+* **File cấu hình:** `jest.config.js`
+* **Thư viện cài đặt:** `npm install -D jest ts-jest @types/jest supertest @types/supertest`
+* **Checklist hoàn thành:**
+  - [ ] Khởi tạo thư mục `tests/`.
+  - [ ] Tạo file cấu hình `jest.config.js` hỗ trợ TypeScript.
+  - [ ] Thêm script `"test": "jest --detectOpenHandles --forceExit"` vào file `package.json`.
+
+#### Việc 4.2: Viết bài test Concurrency (Chống Race Condition)
+* **File cần tạo:** `tests/concurrency.test.ts`
+* **Mục tiêu:** Tạo bằng chứng kỹ thuật chứng minh hệ thống xử lý đúng khi 2 người cùng tranh chấp mượn 1 cuốn sách duy nhất.
+* **Checklist hoàn thành:**
+  - [ ] Chuẩn bị dữ liệu test: 1 đầu sách chỉ có đúng 1 bản sao `BookCopy` trạng thái `AVAILABLE`.
+  - [ ] Sử dụng `Promise.all` gửi đồng thời 2 request đặt mượn từ 2 tài khoản độc giả khác nhau.
+  - [ ] Kiểm chứng kết quả (Assert):
+    - ĐÚNG 1 request nhận mã phản hồi thành công (HTTP 200 / 201).
+    - ĐÚNG 1 request nhận mã lỗi xung đột (HTTP 409 Conflict).
+    - Tồn kho khả dụng `availableCopies` của sách về đúng bằng 0, không bị âm số lượng.
+
+#### Việc 4.3: Viết Unit / Integration Test cho các luồng cốt lõi
+* **File cần tạo:** `tests/auth.test.ts`, `tests/borrow.test.ts`
+* **Checklist hoàn thành:**
+  - [ ] Test Auth: Đăng ký thành công, chặn trùng email, đăng nhập sai pass trả về 401, bảo vệ route bằng RBAC.
+  - [ ] Test Borrow & Return:
+    - Mượn sách thành công trừ tồn kho.
+    - Trả sách quá hạn $\rightarrow$ tính đúng phí phạt 5.000 VNĐ/ngày (sau ân hạn 1 ngày).
+    - Trả sách báo hỏng nhẹ $\rightarrow$ tính đúng 20% giá bìa.
+    - Gia hạn sách quá 2 lần $\rightarrow$ bị chặn.
+
+#### Việc 4.4: Chuẩn hóa bộ dữ liệu mẫu (Seed Data)
+* **File cần sửa:** `prisma/seed.ts`
+* **Mục tiêu:** Khi demo dữ liệu phải phong phú, đẹp mắt như một thư viện thật đang vận hành.
+* **Checklist hoàn thành:**
+  - [ ] Bổ sung ít nhất 20 đầu sách thuộc nhiều thể loại, có ảnh bìa thật sắc nét từ Unsplash hoặc link ảnh chuẩn.
+  - [ ] Tạo 5 tài khoản độc giả mẫu (`reader1`, `reader2`...).
+  - [ ] Tạo sẵn 3 phiếu mượn đang mượn bình thường.
+  - [ ] Tạo sẵn 2 phiếu mượn đã bị quá hạn để hiển thị số cảnh báo đỏ trên dashboard.
+  - [ ] Tạo sẵn 1 khoản phạt chưa thanh toán và 1 khoản phạt đã được thanh toán.
+
+#### Việc 4.5: Soạn Kịch bản Demo phân vai chi tiết & Video dự phòng
+* **File cần tạo:** `DEMO_SCRIPT.md`
+* **Mục tiêu:** Từng thành viên biết chính xác mình làm gì, nói gì lúc demo trước giảng viên.
+* **Checklist hoàn thành:**
+  - [ ] Viết kịch bản Demo phân vai theo trình tự 5 bước:
+    1. *Bước 1 (Độc giả):* Đăng nhập trên điện thoại $\rightarrow$ Tìm kiếm sách $\rightarrow$ Bấm đặt trước giữ chỗ 24h.
+    2. *Bước 2 (Thủ thư tại quầy Checkout):* Dùng webcam/smartphone quét mã QR độc giả $\rightarrow$ Quét barcode sách $\rightarrow$ Xác nhận mượn $\rightarrow$ Độc giả nhận email thông báo.
+    3. *Bước 3 (Thủ thư tại quầy Return):* Quét barcode sách mang trả $\rightarrow$ Báo sách bị "Hỏng nhẹ" $\rightarrow$ Hệ thống tự sinh khoản phạt.
+    4. *Bước 4 (Admin):* Thu tiền phạt hoặc duyệt miễn giảm phạt có lý do $\rightarrow$ Mở Audit Log kiểm tra lịch sử thao tác.
+    5. *Bước 5 (Báo cáo):* Mở trang Reports xem biểu đồ Recharts và bấm tải file Excel.
+  - [ ] **Quay 01 Video clip Demo hoàn chỉnh (5 - 7 phút):** Quay màn hình toàn bộ thao tác theo đúng kịch bản, lưu vào Google Drive để làm phương án dự phòng khi hội trường mất mạng.
+
+#### Việc 4.6: Thiết kế Slide thuyết trình chuyên nghiệp
+* **Công cụ:** Canva hoặc PowerPoint (15 – 20 slide)
+* **Nội dung slide:**
+  - [ ] Slide 1: Tên đề tài, Giảng viên hướng dẫn & Danh sách 4 thành viên.
+  - [ ] Slide 2: Đặt vấn đề và bài toán quản lý thư viện số hóa.
+  - [ ] Slide 3: Kiến trúc tổng thể hệ thống (Tech Stack: Express 5, React 19, Neon PostgreSQL, Cloud Render/Vercel).
+  - [ ] Slide 4: Thiết kế Cơ sở dữ liệu (Sơ đồ ERD 9 thực thể).
+  - [ ] Slide 5: Quy tắc nghiệp vụ cốt lõi (Hạn mượn, giữ chỗ 24h, công thức tính phạt, ân hạn).
+  - [ ] Slide 6 – 10: Các điểm nổi bật kỹ thuật (Xử lý Race condition, Quét Camera Scanner, Tự động hóa Background Cron, Xuất Excel).
+  - [ ] Slide 11: Kết quả kiểm thử tự động (Jest test suite).
+  - [ ] Slide 12: Trực tiếp tiến hành Demo phần mềm.
+  - [ ] Slide 13: Kết luận, Đánh giá kết quả & Hướng phát triển trong tương lai.
+
+---
+
+## PHẦN 3: NGUYÊN TẮC LÀM VIỆC ĐỘC LẬP SONG SONG (KHÔNG CẦN CHỜ ĐỢI)
+
+Cả 4 thành viên hoàn toàn có thể bắt tay vào làm việc ngay từ ngày đầu tiên mà **không ai phải ngồi chờ ai** nhờ vào các cơ chế phân tách sau:
+
+1. **Member 3 (Frontend) làm độc lập không cần chờ Member 2 (Backend):**
+   - **Với Camera Scanner:** Member 3 cài thư viện `html5-qrcode` và bật camera quét bất kỳ mã vạch nào quanh phòng (hộp bánh, sách có sẵn) để hoàn thiện giao diện và sự kiện quét.
+   - **Với Biểu đồ Recharts:** Member 3 dùng mảng dữ liệu giả (`mock data`) ngay trong component để dựng biểu đồ, căn chỉnh màu sắc, responsive trước. Khi Member 2 làm xong API, chỉ mất đúng **2 phút** để đổi sang gọi API thật.
+2. **Member 1 (Tech Lead) làm độc lập:**
+   - Viết Cron jobs và Email service chạy ngầm độc lập với giao diện.
+   - Cấu hình Render và Vercel kết nối với nhánh hiện tại ngay lập tức để kiểm tra môi trường Cloud.
+3. **Member 2 (Backend Data) làm độc lập:**
+   - Viết API và kiểm tra độc lập bằng Postman hoặc trình duyệt, không cần quan tâm Frontend đang viết đến đâu.
+4. **Member 4 (QA / Testing) làm độc lập:**
+   - Viết test Jest dựa trên các API đã có sẵn từ trước trong codebase (`auth`, `book`, `borrow`).
+   - Bổ sung `seed.ts` trực tiếp trên database Neon.
+   - Làm slide thuyết trình và kịch bản demo trên Word/Canva.
+5. **Điểm ghép nối duy nhất:** Chỉ mất 10–15 phút ở cuối chặng để gộp các Pull Request vào nhánh `develop`.
+
+
+---
+
+## PHẦN 4: HƯỚNG DẪN QUY TRÌNH GIT CHI TIẾT DÀNH CHO TỪNG THÀNH VIÊN
 
 Để 4 người làm việc song song không bao giờ bị đè code, mất code hoặc xung đột database, cả nhóm tuân thủ quy trình sau:
 
@@ -405,7 +496,7 @@ Nếu khi pull code mà terminal báo: `CONFLICT (content): Merge conflict in ..
 
 ---
 
-### 5. TIÊU CHÍ ĐÁNH GIÁ THÀNH CÔNG (CHECKLIST NGHIỆM THU)
+## PHẦN 5: TIÊU CHÍ ĐÁNH GIÁ THÀNH CÔNG (CHECKLIST NGHIỆM THU)
 
 - [ ] **Chạy online 100%:** Frontend trên Vercel, Backend trên Render, Database trên Neon (truy cập bằng điện thoại bất cứ lúc nào).
 - [ ] **Nghiệp vụ hoàn chỉnh:** Đặt trước 24h $\rightarrow$ Quét camera Checkout $\rightarrow$ Gia hạn $\rightarrow$ Quét trả sách $\rightarrow$ Tính phạt tự động.
