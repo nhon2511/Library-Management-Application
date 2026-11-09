@@ -2,16 +2,26 @@ import app from './app';
 import { config, validateEnv } from './config';
 import { logger } from './utils/logger';
 import prisma from './config/database';
+import { reservationCleanupJob, stopReservationCleanupJob } from './jobs/reservation-cleanup.job';
+import { overdueCheckJob, stopOverdueCheckJob } from './jobs/overdue-check.job';
+import { dueSoonReminderJob, stopDueSoonReminderJob } from './services/email.service';
 
 validateEnv();
 
 const server = app.listen(config.port, () => {
   logger.info(`Server đang chạy trên port ${config.port} ở chế độ ${config.nodeEnv}`);
+  reservationCleanupJob.start();
+  overdueCheckJob.start();
+  dueSoonReminderJob.start();
+  logger.info('Đã khởi chạy các cron job tự động.');
 });
 
 // Graceful Shutdown
 const gracefulShutdown = async (signal: string) => {
   logger.info(`Nhận tín hiệu ${signal}. Đang tắt server an toàn...`);
+  stopReservationCleanupJob();
+  stopOverdueCheckJob();
+  stopDueSoonReminderJob();
 
   server.close(async () => {
     logger.info('HTTP server đã đóng.');

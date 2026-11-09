@@ -3,7 +3,7 @@ import { bookCopyController } from './book-copy.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { authorize } from '../../middlewares/rbac.middleware';
 import { validate } from '../../middlewares/validate.middleware';
-import { addCopiesSchema, updateCopySchema } from './book-copy.schema';
+import { addCopiesSchema, updateCopySchema, copyIdParamSchema } from './book-copy.schema';
 
 const router = Router();
 
@@ -23,11 +23,30 @@ router.get(
   bookCopyController.findByBook,
 );
 
+// Static route /copies/barcode/:barcode before /copies/:id routes
 router.get(
   '/copies/barcode/:barcode',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
   bookCopyController.findByBarcode,
+);
+
+// Barcode image for a specific copy
+router.get(
+  '/copies/:id/barcode',
+  authenticate,
+  authorize('LIBRARIAN', 'ADMIN'),
+  validate(copyIdParamSchema, 'params'),
+  bookCopyController.getBarcodeImage,
+);
+
+// Public API naming alias retained alongside the legacy /copies path.
+router.get(
+  '/book-copies/:id/barcode',
+  authenticate,
+  authorize('LIBRARIAN', 'ADMIN'),
+  validate(copyIdParamSchema, 'params'),
+  bookCopyController.getBarcodeImage,
 );
 
 router.patch(

@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+export const lookupByBarcodeSchema = z.object({
+  barcode: z.string().trim().min(1, 'barcode không được để trống'),
+});
+
+export type LookupByBarcodeQuery = z.infer<typeof lookupByBarcodeSchema>;
+
 export const reserveSchema = z.object({
   bookId: z.string().min(1, 'bookId không được để trống'),
 });

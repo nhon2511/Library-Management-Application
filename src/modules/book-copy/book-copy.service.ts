@@ -2,12 +2,27 @@ import { randomBytes } from 'crypto';
 import prisma from '../../config/database';
 import { NotFoundError } from '../../utils/api-error';
 import { AddCopiesInput, UpdateCopyInput } from './book-copy.schema';
+import QRCode from 'qrcode';
 
 function generateBarcode(): string {
   return `LIB-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`;
 }
 
 export class BookCopyService {
+  async getBarcodeImage(copyId: string) {
+    const copy = await prisma.bookCopy.findUnique({
+      where: { id: copyId },
+      select: { barcode: true },
+    });
+
+    if (!copy) {
+      throw new NotFoundError('Không tìm thấy bản sao');
+    }
+
+    const dataUrl = await QRCode.toDataURL(copy.barcode, { width: 300, margin: 2 });
+    return dataUrl;
+  }
+
   async addCopies(bookId: string, data: AddCopiesInput) {
     const book = await prisma.book.findFirst({ where: { id: bookId, isDeleted: false } });
     if (!book) throw new NotFoundError('Không tìm thấy sách');

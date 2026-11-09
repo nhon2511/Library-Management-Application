@@ -3,7 +3,8 @@ import { bookController } from './book.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { authorize } from '../../middlewares/rbac.middleware';
 import { validate } from '../../middlewares/validate.middleware';
-import { createBookSchema, updateBookSchema } from './book.schema';
+import { createBookSchema, updateBookSchema, bookIdParamSchema } from './book.schema';
+import { uploadBookCover } from '../../middlewares/upload.middleware';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ router.post(
   '/',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
+  uploadBookCover,
   validate(createBookSchema),
   bookController.create,
 );
@@ -23,14 +25,11 @@ router.patch(
   '/:id',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
+  uploadBookCover,
+  validate(bookIdParamSchema, 'params'),
   validate(updateBookSchema),
   bookController.update,
 );
-router.delete(
-  '/:id',
-  authenticate,
-  authorize('LIBRARIAN', 'ADMIN'),
-  bookController.delete,
-);
+router.delete('/:id', authenticate, authorize('LIBRARIAN', 'ADMIN'), bookController.delete);
 
 export default router;

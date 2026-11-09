@@ -46,12 +46,7 @@ export class ApiResponse {
     });
   }
 
-  static error(
-    res: Response,
-    message: string,
-    statusCode = 500,
-    errors?: unknown,
-  ): Response {
+  static error(res: Response, message: string, statusCode = 500, errors?: unknown): Response {
     const body: ApiResponseBody = {
       success: false,
       statusCode,

@@ -5,7 +5,8 @@ import { asyncHandler } from '../../utils/async-handler';
 
 export class BookController {
   create = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const book = await bookService.create(req.body);
+    const data = req.file?.path ? { ...req.body, coverImageUrl: req.file.path } : req.body;
+    const book = await bookService.create(data);
     ApiResponse.created(res, book, 'Tạo sách thành công');
   });
 
@@ -29,7 +30,8 @@ export class BookController {
   });
 
   update = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const book = await bookService.update(req.params.id as string, req.body);
+    const data = req.file?.path ? { ...req.body, coverImageUrl: req.file.path } : req.body;
+    const book = await bookService.update(req.params.id as string, data);
     ApiResponse.success(res, book, 'Cập nhật sách thành công');
   });
 

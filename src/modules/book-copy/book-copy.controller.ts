@@ -4,6 +4,11 @@ import { ApiResponse } from '../../utils/api-response';
 import { asyncHandler } from '../../utils/async-handler';
 
 export class BookCopyController {
+  getBarcodeImage = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const dataUrl = await bookCopyService.getBarcodeImage(req.params.id as string);
+    ApiResponse.success(res, { dataUrl }, 'Lấy mã barcode thành công');
+  });
+
   addCopies = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const result = await bookCopyService.addCopies(req.params.bookId as string, req.body);
     ApiResponse.created(res, result, `Đã thêm ${result.count} bản sao`);

@@ -11,5 +11,9 @@ export const updateCopySchema = z.object({
   status: z.enum(['AVAILABLE', 'DAMAGED', 'LOST']).optional(),
 });
 
+export const copyIdParamSchema = z.object({
+  id: z.string().min(1, 'id không được để trống'),
+});
+
 export type AddCopiesInput = z.infer<typeof addCopiesSchema>;
 export type UpdateCopyInput = z.infer<typeof updateCopySchema>;

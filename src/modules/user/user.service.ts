@@ -3,6 +3,7 @@ import { NotFoundError } from '../../utils/api-error';
 import { UpdateProfileInput } from './user.schema';
 import { PAGINATION } from '../../utils/constants';
 import { Prisma, Role, UserStatus } from '@prisma/client';
+import QRCode from 'qrcode';
 
 const userSelect = {
   id: true,
@@ -19,6 +20,45 @@ const userSelect = {
 } satisfies Prisma.UserSelect;
 
 export class UserService {
+  async lookupByQrCode(qrCode: string) {
+    const user = await prisma.user.findUnique({
+      where: { qrCode },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        qrCode: true,
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new NotFoundError('Không tìm thấy người dùng hoặc tài khoản không hoạt động');
+    }
+
+    return user;
+  }
+
+  async getQrCodeImage(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { qrCode: true },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Không tìm thấy người dùng');
+    }
+
+    if (!user.qrCode) {
+      throw new NotFoundError('Người dùng chưa có mã QR');
+    }
+
+    const dataUrl = await QRCode.toDataURL(user.qrCode, { width: 300, margin: 2 });
+    return dataUrl;
+  }
+
   async getProfile(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },

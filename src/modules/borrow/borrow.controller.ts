@@ -4,6 +4,12 @@ import { ApiResponse } from '../../utils/api-response';
 import { asyncHandler } from '../../utils/async-handler';
 
 export class BorrowController {
+  lookupByBarcode = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { barcode } = req.query as { barcode: string };
+    const result = await borrowService.lookupByBarcode(barcode);
+    ApiResponse.success(res, result);
+  });
+
   reserve = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const record = await borrowService.reserve(req.user!.id, req.body);
     ApiResponse.created(res, record, 'Đặt mượn thành công');

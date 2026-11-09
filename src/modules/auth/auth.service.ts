@@ -3,11 +3,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import prisma from '../../config/database';
 import { config } from '../../config';
 import { RegisterInput, LoginInput } from './auth.schema';
-import {
-  BadRequestError,
-  ConflictError,
-  UnauthorizedError,
-} from '../../utils/api-error';
+import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/api-error';
 import { JwtPayload } from '../../types';
 
 export class AuthService {

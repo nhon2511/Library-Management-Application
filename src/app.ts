@@ -50,7 +50,11 @@ app.use('/api/', globalRateLimiter);
 app.get('/healthz', async (_req: Request, res: Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    ApiResponse.success(res, { status: 'healthy', database: 'connected' }, 'Hệ thống hoạt động bình thường');
+    ApiResponse.success(
+      res,
+      { status: 'healthy', database: 'connected' },
+      'Hệ thống hoạt động bình thường',
+    );
   } catch (error) {
     ApiResponse.error(res, 'Lỗi kết nối cơ sở dữ liệu', 500, error);
   }

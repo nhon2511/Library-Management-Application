@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+export const lookupByQrCodeSchema = z.object({
+  qrCode: z.string().trim().min(1, 'qrCode không được để trống'),
+});
+
+export const userIdParamSchema = z.object({
+  id: z.string().min(1, 'id không được để trống'),
+});
+
+export type LookupByQrCodeQuery = z.infer<typeof lookupByQrCodeSchema>;
+
 export const updateProfileSchema = z.object({
   firstName: z.string().min(1).max(50).optional(),
   lastName: z.string().min(1).max(50).optional(),

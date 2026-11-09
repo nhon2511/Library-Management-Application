@@ -26,11 +26,6 @@ router.patch(
   validate(updateCategorySchema),
   categoryController.update,
 );
-router.delete(
-  '/:id',
-  authenticate,
-  authorize('LIBRARIAN', 'ADMIN'),
-  categoryController.delete,
-);
+router.delete('/:id', authenticate, authorize('LIBRARIAN', 'ADMIN'), categoryController.delete);
 
 export default router;
