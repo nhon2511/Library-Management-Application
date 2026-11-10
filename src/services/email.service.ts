@@ -38,6 +38,7 @@ async function getTransporter(): Promise<Transporter | null> {
           host,
           port,
           secure: process.env.SMTP_SECURE === 'true',
+          requireTLS: config.isProd && process.env.SMTP_SECURE !== 'true',
           auth: { user, pass },
         });
       }

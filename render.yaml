@@ -2,10 +2,9 @@ services:
   - type: web
     name: library-management-api
     runtime: node
-    plan: 0.5c-512mb
+    plan: free
     buildCommand: npm ci --include=dev && npm run db:generate && npm run build
-    preDeployCommand: npm run db:deploy
-    startCommand: npm start
+    startCommand: npm run db:deploy && npm start
     healthCheckPath: /healthz
     autoDeployTrigger: checksPass
     envVars:
@@ -28,41 +27,11 @@ services:
       - key: CORS_ORIGIN
         sync: false
       - key: SMTP_HOST
-        sync: false
+        value: smtp.resend.com
       - key: SMTP_PORT
-        value: '587'
+        value: '2587'
       - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SMTP_FROM
-        sync: false
-
-  - type: cron
-    name: library-management-jobs
-    runtime: node
-    plan: 0.5c-512mb
-    schedule: '*/15 * * * *'
-    buildCommand: npm ci --include=dev && npm run db:generate && npm run build
-    startCommand: npm run jobs:run
-    autoDeployTrigger: checksPass
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: NODE_VERSION
-        value: '22'
-      - key: DATABASE_URL
-        sync: false
-      - key: JWT_ACCESS_SECRET
-        generateValue: true
-      - key: JWT_REFRESH_SECRET
-        generateValue: true
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: '587'
-      - key: SMTP_USER
-        sync: false
+        value: resend
       - key: SMTP_PASS
         sync: false
       - key: SMTP_FROM
