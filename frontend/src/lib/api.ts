@@ -8,6 +8,31 @@ const api = axios.create({
 let accessToken = sessionStorage.getItem('lms_access_token');
 let refreshing: Promise<string | null> | null = null;
 
+export class BackendUnavailableError extends Error {
+  constructor() {
+    super('Không thể kết nối máy chủ. Vui lòng thử lại sau ít phút.');
+  }
+}
+
+export async function waitForBackend(): Promise<void> {
+  const healthUrl = new URL('/healthz', api.defaults.baseURL).toString();
+  const deadline = Date.now() + 90_000;
+
+  while (true) {
+    try {
+      const response = await axios.get(healthUrl, { timeout: 10_000 });
+      if (response.data?.success === true && response.data?.data?.status === 'healthy') return;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response && ![502, 503, 504].includes(error.response.status)) {
+        throw error;
+      }
+    }
+
+    if (Date.now() >= deadline) throw new BackendUnavailableError();
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+  }
+}
+
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
   token
@@ -37,9 +62,12 @@ api.interceptors.response.use(
         setAccessToken(data.data.accessToken);
         return data.data.accessToken;
       })
-      .catch(() => {
-        setAccessToken(null);
-        return null;
+      .catch((refreshError) => {
+        if ([401, 403].includes(refreshError.response?.status)) {
+          setAccessToken(null);
+          return null;
+        }
+        throw refreshError;
       })
       .finally(() => {
         refreshing = null;

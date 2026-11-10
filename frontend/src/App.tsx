@@ -17,9 +17,18 @@ import {
 import { ProfilePage, CopiesPage } from './pages/profile';
 import { ManageUsersPage, SystemSettingsPage } from './pages/admin';
 function Protected({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
-  const { user, loading } = useAuth();
+  const { user, loading, connectionError, retryConnection } = useAuth();
   const loc = useLocation();
-  if (loading) return <LoadingState label="Đang xác thực phiên làm việc" />;
+  if (loading) return <LoadingState label="Đang kết nối máy chủ và xác thực phiên làm việc…" />;
+  if (connectionError)
+    return (
+      <section className="page">
+        <ErrorState
+          message="Máy chủ đang khởi động hoặc tạm thời không phản hồi. Phiên đăng nhập của bạn vẫn được giữ."
+          retry={retryConnection}
+        />
+      </section>
+    );
   if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />;
   if (roles && !roles.includes(user.role))
     return (

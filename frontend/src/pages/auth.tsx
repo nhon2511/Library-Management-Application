@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { Button, Field, Input, Notice } from '../components/ui';
-import api from '../lib/api';
+import api, { BackendUnavailableError } from '../lib/api';
+import axios from 'axios';
 const loginSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
   password: z.string().min(1, 'Nhập mật khẩu'),
@@ -31,7 +32,14 @@ export function LoginPage() {
       await signIn(v.email, v.password);
       navigate('/');
     } catch (e: any) {
-      setError(e.response?.data?.message || 'Email hoặc mật khẩu không đúng.');
+      const temporarilyUnavailable =
+        e instanceof BackendUnavailableError ||
+        (axios.isAxiosError(e) && (!e.response || [502, 503, 504].includes(e.response.status)));
+      setError(
+        temporarilyUnavailable
+          ? 'Máy chủ đang khởi động hoặc tạm thời không phản hồi. Vui lòng thử lại.'
+          : e.response?.data?.message || 'Email hoặc mật khẩu không đúng.',
+      );
     }
   };
   return (
@@ -48,7 +56,7 @@ export function LoginPage() {
           <Input type="password" autoComplete="current-password" {...register('password')} />
         </Field>
         <Button disabled={isSubmitting} type="submit">
-          {isSubmitting ? 'Đang kiểm tra…' : 'Đăng nhập'}
+          {isSubmitting ? 'Đang kết nối và kiểm tra…' : 'Đăng nhập'}
         </Button>
         <p className="form-foot">
           Chưa có tài khoản? <Link to="/register">Đăng ký làm độc giả</Link>
