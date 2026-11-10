@@ -71,7 +71,7 @@ npm run db:seed             # chạy seed
 npm run db:studio           # mở Prisma Studio
 ```
 
-Repository hiện chưa có script test hoặc test suite được phát hiện. Khi thêm behavior mới, nên bổ sung test phù hợp trước khi mở rộng thay đổi.
+Repository có Jest integration tests trong `tests/` và script `npm test`. Test chỉ chạy với `TEST_DATABASE_URL` trỏ đến PostgreSQL local có tên database kết thúc `_test`; áp dụng migration lên database test trước khi chạy.
 
 ## Database và environment
 

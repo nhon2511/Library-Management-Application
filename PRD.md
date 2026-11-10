@@ -10,6 +10,12 @@
 
 > Tài liệu này được xây dựng từ `PROJECT_PLAN.md`. Những nội dung chưa được xác nhận được đánh dấu là `TBD` hoặc được nêu trong mục **Open Questions**.
 
+### Trạng thái triển khai (2026-11-10)
+
+PRD mô tả yêu cầu sản phẩm, không phải danh sách tính năng đã phát hành. Code hiện có export Excel; **export PDF chưa triển khai**. SystemSetting đã có API và UI cho ADMIN, nhưng chưa có UI/API thay đổi role nhân sự. Email checkout và nhắc hạn dùng SMTP; chưa có hàng đợi retry bền vững. Xem README để biết cách chạy và giới hạn hiện tại.
+
+Refresh token hiện có phiên một lần dùng theo từng thiết bị; logout thu hồi toàn bộ phiên. Quy tắc `LOAN_DAYS` điều khiển hạn trả khi checkout. Các giá trị tiền lưu dưới dạng số nguyên VNĐ và export Excel ghi theo lô. Việc chuyển dữ liệu tiền cũ có giá trị lẻ cần quyết định nghiệp vụ trước khi triển khai migration.
+
 ## 1. Executive Summary
 
 ### Problem Statement
