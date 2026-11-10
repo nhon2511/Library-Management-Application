@@ -8,7 +8,7 @@ export function ProfilePage() {
   const { user, updateUser } = useAuth();
   const [profile, setProfile] = useState<User | null>(user);
   const [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
   const [qrImage, setQrImage] = useState('');
   const { register, handleSubmit, reset } = useForm<{
     firstName: string;
@@ -24,7 +24,11 @@ export function ProfilePage() {
         if (!mounted) return;
         setProfile(data);
         updateUser(data);
-        reset(data);
+        reset({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone ?? '',
+        });
         const qrResponse = await api.get(`/users/${data.id}/qrcode`);
         if (mounted) setQrImage(qrResponse.data.data.dataUrl);
       } finally {
@@ -47,9 +51,12 @@ export function ProfilePage() {
       const r = await api.patch('/users/me', v);
       setProfile(r.data.data);
       updateUser(r.data.data);
-      setNotice('Hồ sơ đã được cập nhật.');
+      setNotice({ message: 'Hồ sơ đã được cập nhật.', tone: 'success' });
     } catch (e: any) {
-      setNotice(e.response?.data?.message || 'Không thể cập nhật hồ sơ.');
+      setNotice({
+        message: e.response?.data?.message || 'Không thể cập nhật hồ sơ.',
+        tone: 'error',
+      });
     }
   };
   return (
@@ -61,7 +68,7 @@ export function ProfilePage() {
           <p>Thông tin hiển thị trên thẻ độc giả và tại quầy phục vụ.</p>
         </div>
       </div>
-      {notice && <Notice tone="success">{notice}</Notice>}
+      {notice && <Notice tone={notice.tone}>{notice.message}</Notice>}
       <div className="profile-layout">
         <form className="form-card stack" onSubmit={handleSubmit(submit)}>
           <h2>Thông tin cơ bản</h2>

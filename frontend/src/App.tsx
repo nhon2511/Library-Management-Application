@@ -15,6 +15,7 @@ import {
   AuditLogsPage,
 } from './pages/operations';
 import { ProfilePage, CopiesPage } from './pages/profile';
+import { ManageUsersPage, SystemSettingsPage } from './pages/admin';
 function Protected({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
@@ -88,6 +89,8 @@ export default function App() {
         }
       >
         <Route path="/audit-logs" element={<AuditLogsPage />} />
+        <Route path="/manage/users" element={<ManageUsersPage />} />
+        <Route path="/system-settings" element={<SystemSettingsPage />} />
       </Route>
       <Route path="/" element={<Home />} />
       <Route path="*" element={<Navigate to="/" replace />} />

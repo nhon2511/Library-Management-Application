@@ -24,7 +24,7 @@ export function AppShell() {
         ['/desk/return', 'Trả sách'],
         ['/manage/fines', 'Tiền phạt'],
         ['/reports', 'Báo cáo'],
-        ...(admin ? [['/audit-logs', 'Audit logs']] : []),
+        ...(admin ? [['/manage/users', 'Người dùng'], ['/system-settings', 'Quy định'], ['/audit-logs', 'Audit logs']] : []),
         ['/profile', 'Hồ sơ'],
       ];
   return (
