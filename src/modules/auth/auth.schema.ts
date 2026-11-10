@@ -16,5 +16,11 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Mật khẩu không được để trống'),
 });
 
+export const refreshSchema = z
+  .object({
+    refreshToken: z.string().min(1).max(4096).optional(),
+  })
+  .optional();
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

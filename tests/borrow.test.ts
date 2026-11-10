@@ -74,4 +74,26 @@ describe('Borrow return business rules', () => {
     expect(fine.type).toBe('DAMAGE');
     expect(fine.amount).toBe(20000);
   });
+
+  it('rounds a fractional damage calculation to whole VND', async () => {
+    const reader = await createTestUser('READER');
+    const { copies } = await createTestBook({ price: 101 });
+    const record = await prisma.borrowRecord.create({
+      data: {
+        userId: reader.id,
+        status: 'BORROWED',
+        dueDate: new Date(Date.now() + 86400000),
+        items: { create: { bookCopyId: copies[0].id } },
+      },
+    });
+    await prisma.bookCopy.update({ where: { id: copies[0].id }, data: { status: 'BORROWED' } });
+    const response = await request(app)
+      .post(`/api/v1/borrows/${record.id}/return`)
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .send({ items: [{ bookCopyId: copies[0].id, condition: 'LIGHT_DAMAGE' }] });
+    expect(response.status).toBe(200);
+    expect(
+      (await prisma.fine.findFirstOrThrow({ where: { borrowRecordId: record.id } })).amount,
+    ).toBe(20);
+  });
 });

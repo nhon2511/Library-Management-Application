@@ -20,6 +20,7 @@ import borrowRoutes from './modules/borrow/borrow.routes';
 import fineRoutes from './modules/fine/fine.routes';
 import reportRoutes from './modules/report/report.routes';
 import auditLogRoutes from './modules/audit-log/audit-log.routes';
+import systemSettingRoutes from './modules/system-setting/system-setting.routes';
 
 const app: Application = appExpress();
 
@@ -55,8 +56,8 @@ app.get('/healthz', async (_req: Request, res: Response) => {
       { status: 'healthy', database: 'connected' },
       'Hệ thống hoạt động bình thường',
     );
-  } catch (error) {
-    ApiResponse.error(res, 'Lỗi kết nối cơ sở dữ liệu', 500, error);
+  } catch {
+    ApiResponse.error(res, 'Lỗi kết nối cơ sở dữ liệu', 503);
   }
 });
 
@@ -73,6 +74,7 @@ app.use('/api/v1/borrows', borrowRoutes);
 app.use('/api/v1/fines', fineRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
+app.use('/api/v1/system-settings', systemSettingRoutes);
 
 // 404 Handler
 app.use((_req: Request, _res: Response, next) => {

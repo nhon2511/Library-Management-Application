@@ -2,6 +2,27 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const requiredEnvVars = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const;
+export function validateEnv(): void {
+  const productionEnvVars = [
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM',
+  ] as const;
+  const allRequired =
+    process.env.NODE_ENV === 'production'
+      ? [...requiredEnvVars, ...productionEnvVars]
+      : requiredEnvVars;
+  const missing = allRequired.filter((key) => !process.env[key]?.trim());
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
+
+validateEnv();
+
 export const config = {
   // Server
   port: parseInt(process.env.PORT || '3000', 10),
@@ -10,12 +31,12 @@ export const config = {
   isProd: process.env.NODE_ENV === 'production',
 
   // Database
-  databaseUrl: process.env.DATABASE_URL || '',
+  databaseUrl: process.env.DATABASE_URL!,
 
   // JWT
   jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET || 'default-access-secret',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'default-refresh-secret',
+    accessSecret: process.env.JWT_ACCESS_SECRET!,
+    refreshSecret: process.env.JWT_REFRESH_SECRET!,
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
@@ -32,13 +53,3 @@ export const config = {
     ),
   },
 } as const;
-
-// Validate required environment variables
-const requiredEnvVars = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const;
-
-export function validateEnv(): void {
-  const missing = requiredEnvVars.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-  }
-}

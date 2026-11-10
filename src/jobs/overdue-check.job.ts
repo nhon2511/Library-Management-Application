@@ -19,7 +19,9 @@ export const overdueCheckJob = cron.createTask('0 0 * * *', async () => {
     const updatedRecords = await markOverdueBorrowRecords();
     logger.info(`Đã cập nhật ${updatedRecords} phiếu mượn quá hạn.`);
   } catch (error) {
-    logger.error('Lỗi cập nhật phiếu mượn quá hạn.', error);
+    logger.error('Lỗi cập nhật phiếu mượn quá hạn.', {
+      name: error instanceof Error ? error.name : 'UnknownError',
+    });
   }
 });
 

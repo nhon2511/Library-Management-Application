@@ -28,6 +28,12 @@ export const returnSchema = z.object({
     )
     .min(1, 'Phải trả ít nhất 1 bản sao'),
 });
+export const borrowIdParamSchema = z.object({ id: z.string().min(1) });
+export const myBorrowsQuerySchema = z.object({
+  status: z.enum(['RESERVED', 'BORROWED', 'RETURNED', 'CANCELLED', 'OVERDUE']).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
 
 export type ReserveInput = z.infer<typeof reserveSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;

@@ -87,20 +87,22 @@ export class BookService {
     return prisma.book.update({ where: { id }, data, include: { category: true } });
   }
 
-  async softDelete(id: string) {
-    const book = await prisma.book.findFirst({ where: { id, isDeleted: false } });
-    if (!book) throw new NotFoundError('Không tìm thấy sách');
-
-    // Check if any copy is borrowed
-    const borrowed = await prisma.bookCopy.count({
-      where: { bookId: id, status: { in: ['BORROWED', 'RESERVED'] } },
+  async softDelete(id: string, actorId: string) {
+    return prisma.$transaction(async (tx) => {
+      const changed = await tx.book.updateMany({
+        where: { id, isDeleted: false },
+        data: { isDeleted: true },
+      });
+      if (changed.count !== 1) throw new NotFoundError('Không tìm thấy sách');
+      const borrowed = await tx.bookCopy.count({
+        where: { bookId: id, status: { in: ['BORROWED', 'RESERVED'] } },
+      });
+      if (borrowed > 0) throw new ConflictError('Không thể xóa sách đang có bản sao được mượn/đặt');
+      await tx.auditLog.create({
+        data: { actorId, action: 'DELETE_BOOK', entity: 'Book', entityId: id },
+      });
+      return tx.book.findUniqueOrThrow({ where: { id } });
     });
-
-    if (borrowed > 0) {
-      throw new ConflictError('Không thể xóa sách đang có bản sao được mượn/đặt');
-    }
-
-    return prisma.book.update({ where: { id }, data: { isDeleted: true } });
   }
 }
 

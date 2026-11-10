@@ -8,6 +8,7 @@ export const PAGINATION = {
 // ── Business rule defaults (also stored in SystemSetting) ──
 export const DEFAULTS = {
   MAX_BORROW_LIMIT: 5,
+  LOAN_DAYS: 14,
   RESERVATION_EXPIRY_HOURS: 24,
   MAX_RENEWALS: 2,
   RENEWAL_DAYS: 7,

@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../utils/api-error';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 
 export const errorHandler = (
   err: Error,
@@ -9,10 +8,15 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction,
 ): void => {
-  logger.error(err.message, {
-    stack: config.isDev ? err.stack : undefined,
+  logger.error('Request failed', {
     name: err.name,
+    statusCode: err instanceof ApiError ? err.statusCode : 500,
   });
+
+  if (res.headersSent) {
+    res.destroy();
+    return;
+  }
 
   if (err instanceof ApiError) {
     const responseBody: Record<string, unknown> = {
@@ -30,6 +34,6 @@ export const errorHandler = (
   res.status(500).json({
     success: false,
     statusCode: 500,
-    message: config.isDev ? err.message : 'Lỗi hệ thống, vui lòng thử lại sau',
+    message: 'Lỗi hệ thống, vui lòng thử lại sau',
   });
 };

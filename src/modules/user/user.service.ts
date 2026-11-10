@@ -1,5 +1,5 @@
 import prisma from '../../config/database';
-import { NotFoundError } from '../../utils/api-error';
+import { BadRequestError, ConflictError, NotFoundError } from '../../utils/api-error';
 import { UpdateProfileInput } from './user.schema';
 import { PAGINATION } from '../../utils/constants';
 import { Prisma, Role, UserStatus } from '@prisma/client';
@@ -59,7 +59,6 @@ export class UserService {
     if (!user) {
       throw new NotFoundError('Không tìm thấy người dùng');
     }
-
     const qrCode = await this.ensureQrCode(userId, user.role, user.qrCode);
 
     const dataUrl = await QRCode.toDataURL(qrCode, { width: 300, margin: 2 });
@@ -99,25 +98,31 @@ export class UserService {
     if (!user) {
       throw new NotFoundError('Không tìm thấy người dùng');
     }
+    if (actorId === userId && status !== 'ACTIVE') {
+      throw new BadRequestError('Không thể tự khóa tài khoản quản trị');
+    }
+    if (user.role === 'ADMIN' && status !== 'ACTIVE') {
+      const activeAdmins = await prisma.user.count({ where: { role: 'ADMIN', status: 'ACTIVE' } });
+      if (activeAdmins <= 1) throw new ConflictError('Không thể khóa quản trị viên cuối cùng');
+    }
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { status },
-      select: userSelect,
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { status },
+        select: userSelect,
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: 'UPDATE_USER_STATUS',
+          entity: 'User',
+          entityId: userId,
+          details: { oldStatus: user.status, newStatus: status },
+        },
+      });
+      return updated;
     });
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        actorId,
-        action: 'UPDATE_USER_STATUS',
-        entity: 'User',
-        entityId: userId,
-        details: { oldStatus: user.status, newStatus: status },
-      },
-    });
-
-    return updated;
   }
 
   async searchUsers(params: {

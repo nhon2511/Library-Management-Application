@@ -3,14 +3,19 @@ import { bookController } from './book.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { authorize } from '../../middlewares/rbac.middleware';
 import { validate } from '../../middlewares/validate.middleware';
-import { createBookSchema, updateBookSchema, bookIdParamSchema } from './book.schema';
+import {
+  createBookSchema,
+  updateBookSchema,
+  bookIdParamSchema,
+  searchBookSchema,
+} from './book.schema';
 import { uploadBookCover } from '../../middlewares/upload.middleware';
 
 const router = Router();
 
 // Public
-router.get('/', bookController.findAll);
-router.get('/:id', bookController.findById);
+router.get('/', validate(searchBookSchema, 'query'), bookController.findAll);
+router.get('/:id', validate(bookIdParamSchema, 'params'), bookController.findById);
 
 // Librarian/Admin
 router.post(
@@ -30,6 +35,12 @@ router.patch(
   validate(updateBookSchema),
   bookController.update,
 );
-router.delete('/:id', authenticate, authorize('LIBRARIAN', 'ADMIN'), bookController.delete);
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('LIBRARIAN', 'ADMIN'),
+  validate(bookIdParamSchema, 'params'),
+  bookController.delete,
+);
 
 export default router;

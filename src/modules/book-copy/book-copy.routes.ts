@@ -3,7 +3,13 @@ import { bookCopyController } from './book-copy.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { authorize } from '../../middlewares/rbac.middleware';
 import { validate } from '../../middlewares/validate.middleware';
-import { addCopiesSchema, updateCopySchema, copyIdParamSchema } from './book-copy.schema';
+import {
+  addCopiesSchema,
+  updateCopySchema,
+  copyIdParamSchema,
+  bookIdParamSchema,
+  barcodeParamSchema,
+} from './book-copy.schema';
 
 const router = Router();
 
@@ -12,6 +18,7 @@ router.post(
   '/books/:bookId/copies',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
+  validate(bookIdParamSchema, 'params'),
   validate(addCopiesSchema),
   bookCopyController.addCopies,
 );
@@ -20,6 +27,7 @@ router.get(
   '/books/:bookId/copies',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
+  validate(bookIdParamSchema, 'params'),
   bookCopyController.findByBook,
 );
 
@@ -28,6 +36,7 @@ router.get(
   '/copies/barcode/:barcode',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
+  validate(barcodeParamSchema, 'params'),
   bookCopyController.findByBarcode,
 );
 
@@ -53,6 +62,7 @@ router.patch(
   '/copies/:id',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
+  validate(copyIdParamSchema, 'params'),
   validate(updateCopySchema),
   bookCopyController.update,
 );

@@ -7,7 +7,7 @@ export const validate = (schema: ZodSchema, source: 'body' | 'query' | 'params' 
     try {
       const data = schema.parse(req[source]);
       if (source === 'query') {
-        Object.assign(req.query, data);
+        Object.defineProperty(req, 'query', { value: data, writable: true, configurable: true });
       } else {
         req[source] = data;
       }

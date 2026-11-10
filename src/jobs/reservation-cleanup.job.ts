@@ -56,7 +56,9 @@ export const reservationCleanupJob = cron.createTask('*/15 * * * *', async () =>
     const releasedCopies = await cleanupExpiredReservations();
     logger.info(`Đã giải phóng ${releasedCopies} bản sao từ các phiếu đặt mượn hết hạn.`);
   } catch (error) {
-    logger.error('Lỗi cleanup phiếu đặt mượn hết hạn.', error);
+    logger.error('Lỗi cleanup phiếu đặt mượn hết hạn.', {
+      name: error instanceof Error ? error.name : 'UnknownError',
+    });
   }
 });
 

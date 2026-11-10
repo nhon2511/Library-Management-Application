@@ -8,6 +8,7 @@ import {
   updateProfileSchema,
   updateUserStatusSchema,
   userIdParamSchema,
+  searchUsersSchema,
 } from './user.schema';
 
 const router = Router();
@@ -26,7 +27,13 @@ router.get('/me', authenticate, userController.getProfile);
 router.patch('/me', authenticate, validate(updateProfileSchema), userController.updateProfile);
 
 // Librarian/Admin routes
-router.get('/', authenticate, authorize('LIBRARIAN', 'ADMIN'), userController.searchUsers);
+router.get(
+  '/',
+  authenticate,
+  authorize('LIBRARIAN', 'ADMIN'),
+  validate(searchUsersSchema, 'query'),
+  userController.searchUsers,
+);
 
 // QR code image — user xem mã mình hoặc LIBRARIAN/ADMIN xem user khác
 router.get(
@@ -39,7 +46,8 @@ router.get(
 router.patch(
   '/:id/status',
   authenticate,
-  authorize('LIBRARIAN', 'ADMIN'),
+  authorize('ADMIN'),
+  validate(userIdParamSchema, 'params'),
   validate(updateUserStatusSchema),
   userController.updateStatus,
 );

@@ -23,11 +23,11 @@ export const updateUserStatusSchema = z.object({
 });
 
 export const searchUsersSchema = z.object({
-  search: z.string().optional(),
+  search: z.string().trim().max(100).optional(),
   role: z.enum(['READER', 'LIBRARIAN', 'ADMIN']).optional(),
   status: z.enum(['ACTIVE', 'SUSPENDED', 'INACTIVE']).optional(),
-  page: z.string().optional(),
-  limit: z.string().optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import prisma from '../../config/database';
 import { config } from '../../config';
 import { RegisterInput, LoginInput } from './auth.schema';
@@ -8,6 +8,16 @@ import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/a
 import { JwtPayload } from '../../types';
 
 export class AuthService {
+  private hashTokenId(tokenId: string): string {
+    return createHash('sha256').update(tokenId).digest('hex');
+  }
+
+  private refreshExpiry(token: string): Date {
+    const payload = jwt.decode(token) as { exp?: number } | null;
+    if (!payload?.exp) throw new Error('Refresh token missing expiry');
+    return new Date(payload.exp * 1000);
+  }
+
   private createQrCode(role: string): string {
     return `${role}-${randomUUID()}`;
   }
@@ -56,6 +66,16 @@ export class AuthService {
       throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
     }
 
+    const isPasswordValid = await bcrypt.compare(data.password, user.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new BadRequestError('Tài khoản đã bị vô hiệu hóa');
+    }
+
     if (!user.qrCode) {
       user.qrCode = this.createQrCode(user.role);
       await prisma.user.update({
@@ -64,28 +84,28 @@ export class AuthService {
       });
     }
 
-    if (user.status === 'INACTIVE') {
-      throw new BadRequestError('Tài khoản đã bị vô hiệu hóa');
-    }
-
-    const isPasswordValid = await bcrypt.compare(data.password, user.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
-    }
-
     const payload: JwtPayload = {
       id: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     };
 
     const accessToken = jwt.sign(payload, config.jwt.accessSecret, {
       expiresIn: config.jwt.accessExpiresIn as SignOptions['expiresIn'],
     });
 
+    const refreshTokenId = randomUUID();
     const refreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
       expiresIn: config.jwt.refreshExpiresIn as SignOptions['expiresIn'],
+      jwtid: refreshTokenId,
+    });
+    await prisma.refreshSession.create({
+      data: {
+        userId: user.id,
+        tokenHash: this.hashTokenId(refreshTokenId),
+        expiresAt: this.refreshExpiry(refreshToken),
+      },
     });
 
     return {
@@ -105,34 +125,66 @@ export class AuthService {
 
   async refreshToken(token: string) {
     try {
-      const decoded = jwt.verify(token, config.jwt.refreshSecret) as JwtPayload;
+      const decoded = jwt.verify(token, config.jwt.refreshSecret) as JwtPayload & { jti?: string };
+      if (!decoded.jti) throw new UnauthorizedError('Refresh token không hợp lệ');
+      const tokenId = decoded.jti;
 
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
+      return await prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({ where: { id: decoded.id } });
+        if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== decoded.tokenVersion) {
+          throw new UnauthorizedError('Refresh token không hợp lệ');
+        }
+
+        const consumed = await tx.refreshSession.updateMany({
+          where: {
+            userId: user.id,
+            tokenHash: this.hashTokenId(tokenId),
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          data: { revokedAt: new Date() },
+        });
+        if (consumed.count !== 1) throw new UnauthorizedError('Refresh token đã được sử dụng');
+
+        const payload: JwtPayload = {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          tokenVersion: user.tokenVersion,
+        };
+        const accessToken = jwt.sign(payload, config.jwt.accessSecret, {
+          expiresIn: config.jwt.accessExpiresIn as SignOptions['expiresIn'],
+        });
+        const nextTokenId = randomUUID();
+        const refreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
+          expiresIn: config.jwt.refreshExpiresIn as SignOptions['expiresIn'],
+          jwtid: nextTokenId,
+        });
+        await tx.refreshSession.create({
+          data: {
+            userId: user.id,
+            tokenHash: this.hashTokenId(nextTokenId),
+            expiresAt: this.refreshExpiry(refreshToken),
+          },
+        });
+        return { accessToken, refreshToken };
       });
-
-      if (!user || user.status === 'INACTIVE') {
-        throw new UnauthorizedError('Token không hợp lệ');
+    } catch (error) {
+      if (error instanceof UnauthorizedError || error instanceof jwt.JsonWebTokenError) {
+        throw new UnauthorizedError('Refresh token không hợp lệ hoặc đã hết hạn');
       }
-
-      const payload: JwtPayload = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      };
-
-      const accessToken = jwt.sign(payload, config.jwt.accessSecret, {
-        expiresIn: config.jwt.accessExpiresIn as SignOptions['expiresIn'],
-      });
-
-      const newRefreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
-        expiresIn: config.jwt.refreshExpiresIn as SignOptions['expiresIn'],
-      });
-
-      return { accessToken, refreshToken: newRefreshToken };
-    } catch {
-      throw new UnauthorizedError('Refresh token không hợp lệ hoặc đã hết hạn');
+      throw error;
     }
+  }
+
+  async logout(userId: string): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
+      await tx.refreshSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
   }
 }
 

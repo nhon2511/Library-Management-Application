@@ -72,7 +72,7 @@ export class CategoryService {
     return prisma.category.update({ where: { id }, data: updateData });
   }
 
-  async delete(id: string) {
+  async delete(id: string, actorId: string) {
     const category = await prisma.category.findUnique({
       where: { id },
       include: { _count: { select: { books: true } } },
@@ -84,7 +84,13 @@ export class CategoryService {
       throw new ConflictError('Không thể xóa danh mục đang có sách');
     }
 
-    return prisma.category.delete({ where: { id } });
+    return prisma.$transaction(async (tx) => {
+      const deleted = await tx.category.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: { actorId, action: 'DELETE_CATEGORY', entity: 'Category', entityId: id },
+      });
+      return deleted;
+    });
   }
 }
 

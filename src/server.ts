@@ -5,6 +5,10 @@ import prisma from './config/database';
 import { reservationCleanupJob, stopReservationCleanupJob } from './jobs/reservation-cleanup.job';
 import { overdueCheckJob, stopOverdueCheckJob } from './jobs/overdue-check.job';
 import { dueSoonReminderJob, stopDueSoonReminderJob } from './services/email.service';
+import {
+  refreshSessionCleanupJob,
+  stopRefreshSessionCleanupJob,
+} from './jobs/refresh-session-cleanup.job';
 
 validateEnv();
 
@@ -13,6 +17,7 @@ const server = app.listen(config.port, () => {
   reservationCleanupJob.start();
   overdueCheckJob.start();
   dueSoonReminderJob.start();
+  refreshSessionCleanupJob.start();
   logger.info('Đã khởi chạy các cron job tự động.');
 });
 
@@ -22,6 +27,7 @@ const gracefulShutdown = async (signal: string) => {
   stopReservationCleanupJob();
   stopOverdueCheckJob();
   stopDueSoonReminderJob();
+  stopRefreshSessionCleanupJob();
 
   server.close(async () => {
     logger.info('HTTP server đã đóng.');
@@ -30,7 +36,9 @@ const gracefulShutdown = async (signal: string) => {
       logger.info('Đã ngắt kết nối PostgreSQL.');
       process.exit(0);
     } catch (error) {
-      logger.error('Lỗi khi ngắt kết nối database:', error);
+      logger.error('Lỗi khi ngắt kết nối database:', {
+        name: error instanceof Error ? error.name : 'UnknownError',
+      });
       process.exit(1);
     }
   });

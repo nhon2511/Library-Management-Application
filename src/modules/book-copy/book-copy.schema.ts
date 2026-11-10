@@ -14,6 +14,8 @@ export const updateCopySchema = z.object({
 export const copyIdParamSchema = z.object({
   id: z.string().min(1, 'id không được để trống'),
 });
+export const bookIdParamSchema = z.object({ bookId: z.string().min(1) });
+export const barcodeParamSchema = z.object({ barcode: z.string().trim().min(1) });
 
 export type AddCopiesInput = z.infer<typeof addCopiesSchema>;
 export type UpdateCopyInput = z.infer<typeof updateCopySchema>;

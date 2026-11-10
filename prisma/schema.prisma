@@ -62,18 +62,20 @@ enum FineStatus {
 // ── Models ─────────────────────────────────────
 
 model User {
-  id        String     @id @default(cuid())
-  email     String     @unique
-  password  String
-  firstName String     @map("first_name")
-  lastName  String     @map("last_name")
-  phone     String?
-  role      Role       @default(READER)
-  status    UserStatus @default(ACTIVE)
-  avatarUrl String?    @map("avatar_url")
-  qrCode    String?    @unique @map("qr_code")
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  id              String           @id @default(cuid())
+  email           String           @unique
+  password        String
+  firstName       String           @map("first_name")
+  lastName        String           @map("last_name")
+  phone           String?
+  role            Role             @default(READER)
+  status          UserStatus       @default(ACTIVE)
+  tokenVersion    Int              @default(0) @map("token_version")
+  refreshSessions RefreshSession[]
+  avatarUrl       String?          @map("avatar_url")
+  qrCode          String?          @unique @map("qr_code")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
 
   borrowRecords    BorrowRecord[] @relation("ReaderBorrows")
   processedRecords BorrowRecord[] @relation("LibrarianProcesses")
@@ -83,6 +85,21 @@ model User {
   @@index([email])
   @@index([role, status])
   @@map("users")
+}
+
+model RefreshSession {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("refresh_sessions")
 }
 
 model Category {
@@ -107,7 +124,7 @@ model Book {
   publishedYear   Int?     @map("published_year")
   description     String?
   coverImageUrl   String?  @map("cover_image_url")
-  price           Float    @default(0)
+  price           Int      @default(0)
   totalCopies     Int      @default(0) @map("total_copies")
   availableCopies Int      @default(0) @map("available_copies")
   categoryId      String   @map("category_id")
@@ -124,6 +141,7 @@ model Book {
   @@index([categoryId])
   @@map("books")
 }
+
 model BookCopy {
   id            String         @id @default(cuid())
   barcode       String         @unique
@@ -144,18 +162,19 @@ model BookCopy {
 }
 
 model BorrowRecord {
-  id          String       @id @default(cuid())
-  userId      String       @map("user_id")
-  librarianId String?      @map("librarian_id")
-  status      BorrowStatus @default(RESERVED)
-  borrowDate  DateTime?    @map("borrow_date")
-  dueDate     DateTime?    @map("due_date")
-  returnDate  DateTime?    @map("return_date")
-  renewCount  Int          @default(0) @map("renew_count")
-  notes       String?
-  expiresAt   DateTime?    @map("expires_at")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  id             String       @id @default(cuid())
+  userId         String       @map("user_id")
+  librarianId    String?      @map("librarian_id")
+  status         BorrowStatus @default(RESERVED)
+  borrowDate     DateTime?    @map("borrow_date")
+  dueDate        DateTime?    @map("due_date")
+  returnDate     DateTime?    @map("return_date")
+  renewCount     Int          @default(0) @map("renew_count")
+  notes          String?
+  expiresAt      DateTime?    @map("expires_at")
+  reminderSentAt DateTime?    @map("reminder_sent_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
   user      User         @relation("ReaderBorrows", fields: [userId], references: [id])
   librarian User?        @relation("LibrarianProcesses", fields: [librarianId], references: [id])
@@ -194,8 +213,8 @@ model Fine {
   borrowRecordId String?    @map("borrow_record_id")
   type           FineType
   status         FineStatus @default(UNPAID)
-  amount         Float
-  paidAmount     Float      @default(0) @map("paid_amount")
+  amount         Int
+  paidAmount     Int        @default(0) @map("paid_amount")
   reason         String?
   paidAt         DateTime?  @map("paid_at")
   paymentMethod  String?    @map("payment_method")
@@ -244,5 +263,3 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
-
-

@@ -3,8 +3,13 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { UnauthorizedError } from '../utils/api-error';
 import { JwtPayload } from '../types';
+import prisma from '../config/database';
 
-export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
+export const authenticate = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -19,11 +24,18 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction): 
     }
 
     const decoded = jwt.verify(token, config.jwt.accessSecret) as JwtPayload;
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, role: true, status: true, tokenVersion: true },
+    });
+    if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== decoded.tokenVersion) {
+      throw new UnauthorizedError('Phiên đăng nhập không hợp lệ');
+    }
 
     req.user = {
-      id: decoded.id,
-      email: decoded.email,
-      role: decoded.role,
+      id: user.id,
+      email: user.email,
+      role: user.role,
     };
 
     next();

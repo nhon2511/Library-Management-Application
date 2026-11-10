@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import prisma from '../../config/database';
-import { NotFoundError } from '../../utils/api-error';
+import { ConflictError, NotFoundError } from '../../utils/api-error';
 import { AddCopiesInput, UpdateCopyInput } from './book-copy.schema';
 import QRCode from 'qrcode';
 
@@ -36,13 +36,14 @@ export class BookCopyService {
     const result = await prisma.$transaction(async (tx) => {
       const created = await tx.bookCopy.createMany({ data: copies });
 
-      await tx.book.update({
-        where: { id: bookId },
+      const updated = await tx.book.updateMany({
+        where: { id: bookId, isDeleted: false },
         data: {
           totalCopies: { increment: data.quantity },
           availableCopies: { increment: data.quantity },
         },
       });
+      if (updated.count !== 1) throw new ConflictError('Sách vừa được xóa');
 
       return created;
     });
@@ -77,10 +78,26 @@ export class BookCopyService {
   }
 
   async update(id: string, data: UpdateCopyInput) {
-    const copy = await prisma.bookCopy.findUnique({ where: { id } });
-    if (!copy) throw new NotFoundError('Không tìm thấy bản sao');
-
-    return prisma.bookCopy.update({ where: { id }, data });
+    return prisma.$transaction(async (tx) => {
+      const copy = await tx.bookCopy.findUnique({ where: { id }, include: { book: true } });
+      if (!copy || copy.book.isDeleted) throw new NotFoundError('Không tìm thấy bản sao');
+      if (data.status && ['BORROWED', 'RESERVED'].includes(copy.status)) {
+        throw new ConflictError('Không thể đổi trạng thái bản sao đang được mượn hoặc đặt');
+      }
+      const updated = await tx.bookCopy.updateMany({ where: { id, status: copy.status }, data });
+      if (updated.count !== 1) throw new ConflictError('Bản sao vừa thay đổi');
+      if (data.status && data.status !== copy.status) {
+        const change =
+          (data.status === 'AVAILABLE' ? 1 : 0) - (copy.status === 'AVAILABLE' ? 1 : 0);
+        if (change !== 0) {
+          await tx.book.update({
+            where: { id: copy.bookId },
+            data: { availableCopies: { increment: change } },
+          });
+        }
+      }
+      return tx.bookCopy.findUniqueOrThrow({ where: { id } });
+    });
   }
 }
 

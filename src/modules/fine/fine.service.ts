@@ -36,8 +36,8 @@ export class FineService {
     if (fine.status === 'PAID') throw new BadRequestError('Khoản phạt đã được thanh toán');
     if (fine.status === 'WAIVED') throw new BadRequestError('Khoản phạt đã được miễn giảm');
 
-    return prisma.fine.update({
-      where: { id },
+    const updated = await prisma.fine.updateMany({
+      where: { id, status: 'UNPAID' },
       data: {
         status: 'PAID',
         paidAmount: fine.amount,
@@ -45,16 +45,18 @@ export class FineService {
         paymentMethod,
       },
     });
+    if (updated.count !== 1) throw new BadRequestError('Khoản phạt đã được xử lý');
+    return prisma.fine.findUniqueOrThrow({ where: { id } });
   }
 
   async waive(id: string, adminId: string, reason: string) {
     const fine = await prisma.fine.findUnique({ where: { id } });
     if (!fine) throw new NotFoundError('Không tìm thấy khoản phạt');
-    if (fine.status === 'PAID') throw new BadRequestError('Không thể miễn giảm khoản phạt đã trả');
+    if (fine.status !== 'UNPAID') throw new BadRequestError('Khoản phạt đã được xử lý');
 
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const updated = await tx.fine.update({
-        where: { id },
+      const changed = await tx.fine.updateMany({
+        where: { id, status: 'UNPAID' },
         data: {
           status: 'WAIVED',
           waivedBy: adminId,
@@ -62,6 +64,8 @@ export class FineService {
           waivedAt: new Date(),
         },
       });
+      if (changed.count !== 1) throw new BadRequestError('Khoản phạt đã được xử lý');
+      const updated = await tx.fine.findUniqueOrThrow({ where: { id } });
 
       await tx.auditLog.create({
         data: {

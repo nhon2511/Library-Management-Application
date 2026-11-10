@@ -7,7 +7,7 @@ import prisma from '../src/config/database';
 export const testPassword = 'Test@12345';
 export const testPrefix = `qa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-export async function createTestUser(role: 'READER' | 'LIBRARIAN') {
+export async function createTestUser(role: 'READER' | 'LIBRARIAN' | 'ADMIN') {
   const uniqueId = Math.random().toString(36).slice(2, 10);
   return prisma.user.create({
     data: {
@@ -38,13 +38,17 @@ export async function cleanupTestData(): Promise<void> {
   });
   const userIds = users.map((user) => user.id);
 
+  await prisma.auditLog.deleteMany({ where: { actorId: { in: userIds } } });
+
   const records = await prisma.borrowRecord.findMany({
     where: { userId: { in: userIds } },
     select: { id: true },
   });
   const recordIds = records.map((record) => record.id);
 
-  await prisma.fine.deleteMany({ where: { borrowRecordId: { in: recordIds } } });
+  await prisma.fine.deleteMany({
+    where: { OR: [{ borrowRecordId: { in: recordIds } }, { userId: { in: userIds } }] },
+  });
   await prisma.borrowItem.deleteMany({ where: { borrowRecordId: { in: recordIds } } });
   await prisma.borrowRecord.deleteMany({ where: { id: { in: recordIds } } });
 

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import bcrypt from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import 'dotenv/config';
 
 const connectionString = process.env.DATABASE_URL;
@@ -174,189 +174,92 @@ const bookDefinitions = [
 ] as const;
 
 async function main() {
-  console.info('🌱 Đang seed dữ liệu mẫu...');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Seed dữ liệu mẫu không được chạy trong production');
+  }
 
-  await prisma.auditLog.deleteMany();
-  await prisma.fine.deleteMany();
-  await prisma.borrowItem.deleteMany();
-  await prisma.borrowRecord.deleteMany();
-  await prisma.bookCopy.deleteMany();
-  await prisma.book.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.user.deleteMany();
+  const adminEmail = process.env.SEED_ADMIN_EMAIL;
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (Boolean(adminEmail) !== Boolean(adminPassword)) {
+    throw new Error('Cần cấu hình đồng thời SEED_ADMIN_EMAIL và SEED_ADMIN_PASSWORD');
+  }
+  if (adminEmail && adminPassword) {
+    const bcrypt = await import('bcryptjs');
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      create: {
+        email: adminEmail,
+        password: await bcrypt.default.hash(adminPassword, 12),
+        firstName: 'System',
+        lastName: 'Admin',
+        role: 'ADMIN',
+        qrCode: `ADMIN-${randomUUID()}`,
+      },
+      update: {},
+    });
+  }
 
-  const [adminPassword, librarianPassword, readerPassword] = await Promise.all([
-    bcrypt.hash('Admin@123', 12),
-    bcrypt.hash('Librarian@123', 12),
-    bcrypt.hash('Reader@123', 12),
-  ]);
+  const categoryByName = new Map<string, string>();
+  for (const name of new Set(bookDefinitions.map((book) => book[3]))) {
+    const slug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/&/g, 'va')
+      .replace(/\s+/g, '-');
+    const category = await prisma.category.upsert({
+      where: { slug },
+      create: { name, slug, description: `Sách thuộc nhóm ${name}` },
+      update: {},
+    });
+    categoryByName.set(name, category.id);
+  }
 
-  const admin = await prisma.user.create({
-    data: {
-      email: 'admin@library.com',
-      password: adminPassword,
-      firstName: 'System',
-      lastName: 'Admin',
-      phone: '0900000001',
-      role: 'ADMIN',
-      qrCode: 'ADMIN-QR-001',
-    },
-  });
-  const librarian = await prisma.user.create({
-    data: {
-      email: 'librarian@library.com',
-      password: librarianPassword,
-      firstName: 'Thu',
-      lastName: 'Thư',
-      phone: '0900000002',
-      role: 'LIBRARIAN',
-      qrCode: 'LIBRARIAN-QR-001',
-    },
-  });
-
-  const readers = await Promise.all(
-    Array.from({ length: 5 }, (_, index) =>
-      prisma.user.create({
-        data: {
-          email: `reader${index + 1}@library.local`,
-          password: readerPassword,
-          firstName: `Độc giả ${index + 1}`,
-          lastName: 'Thư viện',
-          phone: `09000000${10 + index}`,
-          role: 'READER',
-          qrCode: `READER-QR-00${index + 1}`,
-        },
-      }),
-    ),
-  );
-
-  const categoryNames = [...new Set(bookDefinitions.map((book) => book[3]))];
-  const categories = await Promise.all(
-    categoryNames.map((name) =>
-      prisma.category.create({
-        data: {
-          name,
-          slug: name
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/&/g, 'va')
-            .replace(/\s+/g, '-'),
-          description: `Sách thuộc nhóm ${name}`,
-        },
-      }),
-    ),
-  );
-  const categoryByName = new Map(categories.map((category) => [category.name, category]));
-
-  const books = [];
   for (const [isbn, title, author, categoryName, shelfLocation, coverImageUrl] of bookDefinitions) {
-    const category = categoryByName.get(categoryName);
-    if (!category) throw new Error(`Thiếu category ${categoryName}`);
-
-    const book = await prisma.book.create({
-      data: {
+    const categoryId = categoryByName.get(categoryName);
+    if (!categoryId) throw new Error('Thiếu category trong dữ liệu mẫu');
+    const book = await prisma.book.upsert({
+      where: { isbn },
+      create: {
         isbn,
         title,
         author,
+        categoryId,
+        coverImageUrl,
         publisher: 'Library Press',
         publishedYear: 2000,
         description: `Tài liệu tham khảo: ${title}`,
-        coverImageUrl,
         price: 180000,
-        totalCopies: 2,
-        availableCopies: 2,
-        categoryId: category.id,
       },
+      update: {},
     });
-    await prisma.bookCopy.createMany({
-      data: [
-        {
-          bookId: book.id,
-          barcode: `LIB-${isbn.slice(-5)}-01`,
-          shelfLocation: `${shelfLocation}-01`,
-        },
-        {
-          bookId: book.id,
-          barcode: `LIB-${isbn.slice(-5)}-02`,
-          shelfLocation: `${shelfLocation}-02`,
-        },
-      ],
-    });
-    books.push(book);
+    for (let index = 1; index <= 2; index += 1) {
+      const barcode = `LIB-${isbn.slice(-5)}-${String(index).padStart(2, '0')}`;
+      const existing = await prisma.bookCopy.findUnique({ where: { barcode } });
+      if (!existing) {
+        await prisma.$transaction(async (tx) => {
+          await tx.bookCopy.create({
+            data: {
+              bookId: book.id,
+              barcode,
+              shelfLocation: `${shelfLocation}-${String(index).padStart(2, '0')}`,
+            },
+          });
+          await tx.book.update({
+            where: { id: book.id },
+            data: { totalCopies: { increment: 1 }, availableCopies: { increment: 1 } },
+          });
+        });
+      }
+    }
   }
 
-  const now = new Date();
-  const normalDueDate = new Date(now);
-  normalDueDate.setDate(normalDueDate.getDate() + 10);
-  const overdueDueDate = new Date(now);
-  overdueDueDate.setDate(overdueDueDate.getDate() - 5);
-  const borrowDate = new Date(now);
-  borrowDate.setDate(borrowDate.getDate() - 12);
-
-  const borrowedCopies = await prisma.bookCopy.findMany({
-    where: { bookId: { in: books.slice(0, 5).map((book) => book.id) } },
-    orderBy: { barcode: 'asc' },
-  });
-  const records = [];
-  for (let index = 0; index < 5; index += 1) {
-    const isOverdue = index >= 3;
-    const copy = borrowedCopies[index];
-    const record = await prisma.borrowRecord.create({
-      data: {
-        userId: readers[index].id,
-        librarianId: librarian.id,
-        status: isOverdue ? 'OVERDUE' : 'BORROWED',
-        borrowDate,
-        dueDate: isOverdue ? overdueDueDate : normalDueDate,
-        items: { create: { bookCopyId: copy.id, status: 'BORROWED' } },
-      },
-    });
-    await prisma.bookCopy.update({ where: { id: copy.id }, data: { status: 'BORROWED' } });
-    await prisma.book.update({
-      where: { id: copy.bookId },
-      data: { availableCopies: { decrement: 1 } },
-    });
-    records.push(record);
-  }
-
-  await prisma.fine.create({
-    data: {
-      userId: readers[3].id,
-      borrowRecordId: records[3].id,
-      type: 'OVERDUE',
-      amount: 25000,
-      reason: 'Phạt quá hạn chưa thanh toán',
-    },
-  });
-  await prisma.fine.create({
-    data: {
-      userId: readers[4].id,
-      borrowRecordId: records[4].id,
-      type: 'OVERDUE',
-      status: 'PAID',
-      amount: 15000,
-      paidAmount: 15000,
-      paidAt: now,
-      paymentMethod: 'CASH',
-      reason: 'Phạt quá hạn đã thanh toán',
-    },
-  });
-
-  console.info('Seed thành công:', {
-    admin: admin.email,
-    librarian: librarian.email,
-    readers: readers.length,
-    categories: categories.length,
-    books: books.length,
-    activeBorrows: 3,
-    overdueBorrows: 2,
-  });
+  console.info('Seed dữ liệu mẫu hoàn tất');
 }
 
 main()
   .catch((error) => {
-    console.error('Lỗi khi seed dữ liệu:', error);
+    console.error('Seed thất bại', { name: error instanceof Error ? error.name : 'UnknownError' });
     process.exit(1);
   })
   .finally(async () => {

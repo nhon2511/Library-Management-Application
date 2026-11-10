@@ -30,7 +30,7 @@ export class CategoryController {
   });
 
   delete = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await categoryService.delete(req.params.id as string);
+    await categoryService.delete(req.params.id as string, req.user!.id);
     ApiResponse.success(res, null, 'Xóa danh mục thành công');
   });
 }

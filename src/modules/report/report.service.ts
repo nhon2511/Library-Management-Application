@@ -148,25 +148,15 @@ export class ReportService {
   }
 
   async exportExcel(res: Response) {
-    const records = await prisma.borrowRecord.findMany({
-      where: { status: { in: ['BORROWED', 'OVERDUE'] } },
-      include: {
-        user: { select: { firstName: true, lastName: true, email: true } },
-        items: {
-          include: {
-            bookCopy: {
-              include: { book: { select: { title: true } } },
-            },
-          },
-        },
-      },
-      orderBy: { borrowDate: 'desc' },
-    });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename=borrows-report.xlsx');
+    res.setHeader('Cache-Control', 'no-store');
 
-    const workbook = new ExcelJS.Workbook();
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
     workbook.creator = 'Library Management System';
-    workbook.created = new Date();
-
     const sheet = workbook.addWorksheet('Phiếu mượn đang hoạt động');
 
     sheet.columns = [
@@ -181,61 +171,54 @@ export class ReportService {
       { header: 'Trạng thái', key: 'status', width: 14 },
     ];
 
-    // Header style
     const headerRow = sheet.getRow(1);
     headerRow.font = { bold: true };
-    headerRow.eachCell((cell) => {
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      };
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFD9E1F2' },
-      };
-    });
+    headerRow.commit();
 
     let stt = 1;
-    for (const record of records) {
-      for (const item of record.items) {
-        const row = sheet.addRow({
-          stt,
-          recordId: record.id,
-          readerName: `${record.user.lastName} ${record.user.firstName}`,
-          email: record.user.email,
-          bookTitle: item.bookCopy.book.title,
-          barcode: item.bookCopy.barcode,
-          borrowDate: record.borrowDate
-            ? new Date(record.borrowDate).toLocaleDateString('vi-VN')
-            : '',
-          dueDate: record.dueDate ? new Date(record.dueDate).toLocaleDateString('vi-VN') : '',
-          status: record.status,
-        });
-
-        row.eachCell((cell) => {
-          cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
-          };
-        });
-
-        stt++;
+    let cursor: string | undefined;
+    while (true) {
+      const records = await prisma.borrowRecord.findMany({
+        where: { status: { in: ['BORROWED', 'OVERDUE'] } },
+        select: {
+          id: true,
+          status: true,
+          borrowDate: true,
+          dueDate: true,
+          user: { select: { firstName: true, lastName: true, email: true } },
+          items: {
+            select: { bookCopy: { select: { barcode: true, book: { select: { title: true } } } } },
+          },
+        },
+        orderBy: [{ borrowDate: 'desc' }, { id: 'desc' }],
+        take: 200,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      if (records.length === 0) break;
+      for (const record of records) {
+        for (const item of record.items) {
+          sheet
+            .addRow({
+              stt,
+              recordId: record.id,
+              readerName: `${record.user.lastName} ${record.user.firstName}`,
+              email: record.user.email,
+              bookTitle: item.bookCopy.book.title,
+              barcode: item.bookCopy.barcode,
+              borrowDate: record.borrowDate
+                ? new Date(record.borrowDate).toLocaleDateString('vi-VN')
+                : '',
+              dueDate: record.dueDate ? new Date(record.dueDate).toLocaleDateString('vi-VN') : '',
+              status: record.status,
+            })
+            .commit();
+          stt++;
+        }
       }
+      cursor = records[records.length - 1].id;
     }
-
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader('Content-Disposition', 'attachment; filename=borrows-report.xlsx');
-
-    await workbook.xlsx.write(res);
-    res.end();
+    sheet.commit();
+    await workbook.commit();
   }
 }
 

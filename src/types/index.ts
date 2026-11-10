@@ -4,6 +4,7 @@ export interface JwtPayload {
   id: string;
   email: string;
   role: Role;
+  tokenVersion: number;
 }
 
 export interface PaginationQuery {

@@ -8,6 +8,8 @@ import {
   reserveSchema,
   checkoutSchema,
   returnSchema,
+  borrowIdParamSchema,
+  myBorrowsQuerySchema,
 } from './borrow.schema';
 
 const router = Router();
@@ -29,8 +31,20 @@ router.post(
   validate(reserveSchema),
   borrowController.reserve,
 );
-router.post('/:id/renew', authenticate, authorize('READER'), borrowController.renew);
-router.get('/my', authenticate, authorize('READER'), borrowController.getMyBorrows);
+router.post(
+  '/:id/renew',
+  authenticate,
+  authorize('READER'),
+  validate(borrowIdParamSchema, 'params'),
+  borrowController.renew,
+);
+router.get(
+  '/my',
+  authenticate,
+  authorize('READER'),
+  validate(myBorrowsQuerySchema, 'query'),
+  borrowController.getMyBorrows,
+);
 
 // Librarian/Admin
 router.post(
@@ -44,6 +58,7 @@ router.post(
   '/:id/return',
   authenticate,
   authorize('LIBRARIAN', 'ADMIN'),
+  validate(borrowIdParamSchema, 'params'),
   validate(returnSchema),
   borrowController.returnBooks,
 );
