@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import prisma from '../../config/database';
 import { config } from '../../config';
 import { RegisterInput, LoginInput } from './auth.schema';
@@ -7,6 +8,10 @@ import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/a
 import { JwtPayload } from '../../types';
 
 export class AuthService {
+  private createQrCode(role: string): string {
+    return `${role}-${randomUUID()}`;
+  }
+
   async register(data: RegisterInput) {
     const existing = await prisma.user.findUnique({
       where: { email: data.email },
@@ -25,6 +30,7 @@ export class AuthService {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
+        qrCode: this.createQrCode('READER'),
       },
       select: {
         id: true,
@@ -33,6 +39,7 @@ export class AuthService {
         lastName: true,
         role: true,
         status: true,
+        qrCode: true,
         createdAt: true,
       },
     });
@@ -47,6 +54,14 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
+    }
+
+    if (!user.qrCode) {
+      user.qrCode = this.createQrCode(user.role);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { qrCode: user.qrCode },
+      });
     }
 
     if (user.status === 'INACTIVE') {
@@ -83,6 +98,7 @@ export class AuthService {
         lastName: user.lastName,
         role: user.role,
         status: user.status,
+        qrCode: user.qrCode,
       },
     };
   }

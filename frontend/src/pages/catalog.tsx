@@ -1,6 +1,8 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import api from '../lib/api';
+import { useAuth } from '../lib/auth';
 import type { Book, Category } from '../lib/types';
 import {
   Button,
@@ -166,14 +168,31 @@ function BookCard({ book }: { book: Book }) {
 }
 export function BookDetailPage() {
   const id = location.pathname.split('/').pop();
+  const { user } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [error, setError] = useState('');
+  const [reserving, setReserving] = useState(false);
   useEffect(() => {
     api
       .get(`/books/${id}`)
       .then((r) => setBook(r.data.data))
       .catch((e) => setError(e.response?.data?.message || 'Không tìm thấy sách.'));
   }, [id]);
+  const reserve = async () => {
+    if (!book || reserving) return;
+    setReserving(true);
+    try {
+      await api.post('/borrows/reserve', { bookId: book.id });
+      setBook((current) =>
+        current ? { ...current, availableCopies: Math.max(0, current.availableCopies - 1) } : current,
+      );
+      toast.success('Đã đặt mượn sách. Vui lòng đến quầy để nhận sách.');
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Không thể đặt mượn sách.');
+    } finally {
+      setReserving(false);
+    }
+  };
   if (error)
     return (
       <section className="page">
@@ -198,6 +217,15 @@ export function BookDetailPage() {
           <h1>{book.title}</h1>
           <p className="detail-author">{book.author}</p>
           <p className="detail-description">{book.description || 'Đầu sách này chưa có mô tả.'}</p>
+          {user?.role === 'READER' && (
+            <Button disabled={reserving || book.availableCopies < 1} onClick={reserve}>
+              {reserving
+                ? 'Đang đặt mượn…'
+                : book.availableCopies > 0
+                  ? 'Đặt mượn sách'
+                  : 'Hết bản sao khả dụng'}
+            </Button>
+          )}
           <dl className="detail-facts">
             <div>
               <dt>ISBN</dt>

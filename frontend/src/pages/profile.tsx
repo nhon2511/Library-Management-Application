@@ -119,6 +119,9 @@ export function CopiesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editingCopy, setEditingCopy] = useState<any | null>(null);
+  const [codeCopy, setCodeCopy] = useState<any | null>(null);
+  const [codeImage, setCodeImage] = useState('');
+  const [codeLoading, setCodeLoading] = useState(false);
   const load = () =>
     Promise.all([api.get(`/books/${id}`), api.get(`/books/${id}/copies`)])
       .then(([b, c]) => {
@@ -171,6 +174,20 @@ export function CopiesPage() {
       setNotice(e.response?.data?.message || 'Không thể cập nhật bản sao.');
     }
   };
+  const showCode = async (copy: any) => {
+    setCodeCopy(copy);
+    setCodeImage('');
+    setCodeLoading(true);
+    try {
+      const response = await api.get(`/book-copies/${copy.id}/barcode`);
+      setCodeImage(response.data.data.dataUrl);
+    } catch (e: any) {
+      setNotice(e.response?.data?.message || 'Không thể tải mã QR.');
+      setCodeCopy(null);
+    } finally {
+      setCodeLoading(false);
+    }
+  };
   return (
     <section className="page page-wide">
       <div className="page-intro">
@@ -208,6 +225,9 @@ export function CopiesPage() {
                   </td>
                   <td>{c.condition || '—'}</td>
                   <td>
+                    <Button variant="ghost" onClick={() => showCode(c)}>
+                      Mã QR
+                    </Button>
                     <Button variant="ghost" onClick={() => setEditingCopy(c)}>
                       Sửa
                     </Button>
@@ -278,6 +298,19 @@ export function CopiesPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+      {codeCopy && (
+        <Modal title="Mã QR bản sao" onClose={() => setCodeCopy(null)}>
+          <div className="copy-code-modal">
+            <strong>{codeCopy.barcode}</strong>
+            {codeLoading ? (
+              <LoadingState label="Đang tạo mã QR" />
+            ) : (
+              <img src={codeImage} alt={`Mã QR ${codeCopy.barcode}`} />
+            )}
+            <small>Quét mã này tại quầy checkout hoặc trả sách.</small>
+          </div>
         </Modal>
       )}
     </section>

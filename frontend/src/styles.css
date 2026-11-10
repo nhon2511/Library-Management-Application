@@ -508,6 +508,33 @@ button:disabled {
   max-width: 620px;
   font-size: 16px;
 }
+.copy-code-modal {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.copy-code-modal img {
+  width: 240px;
+  height: 240px;
+  image-rendering: pixelated;
+}
+.copy-code-modal small {
+  color: var(--muted);
+}
+.cover-preview {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cover-preview img {
+  width: 96px;
+  height: 132px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
 .detail-facts {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1053,6 +1080,15 @@ td small {
   padding: 9px 13px;
   border-radius: 7px;
   color: var(--forest) !important;
+}
+.public-logout {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+}
+.public-logout:hover {
+  color: var(--forest);
 }
 .auth-wrap {
   min-height: calc(100vh - 76px);

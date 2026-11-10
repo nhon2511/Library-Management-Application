@@ -4,6 +4,7 @@ import { UpdateProfileInput } from './user.schema';
 import { PAGINATION } from '../../utils/constants';
 import { Prisma, Role, UserStatus } from '@prisma/client';
 import QRCode from 'qrcode';
+import { randomUUID } from 'node:crypto';
 
 const userSelect = {
   id: true,
@@ -20,6 +21,14 @@ const userSelect = {
 } satisfies Prisma.UserSelect;
 
 export class UserService {
+  private async ensureQrCode(userId: string, role: Role, currentQrCode: string | null) {
+    if (currentQrCode) return currentQrCode;
+
+    const qrCode = `${role}-${randomUUID()}`;
+    await prisma.user.update({ where: { id: userId }, data: { qrCode } });
+    return qrCode;
+  }
+
   async lookupByQrCode(qrCode: string) {
     const user = await prisma.user.findUnique({
       where: { qrCode },
@@ -44,18 +53,16 @@ export class UserService {
   async getQrCodeImage(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { qrCode: true },
+      select: { role: true, qrCode: true },
     });
 
     if (!user) {
       throw new NotFoundError('Không tìm thấy người dùng');
     }
 
-    if (!user.qrCode) {
-      throw new NotFoundError('Người dùng chưa có mã QR');
-    }
+    const qrCode = await this.ensureQrCode(userId, user.role, user.qrCode);
 
-    const dataUrl = await QRCode.toDataURL(user.qrCode, { width: 300, margin: 2 });
+    const dataUrl = await QRCode.toDataURL(qrCode, { width: 300, margin: 2 });
     return dataUrl;
   }
 
@@ -67,6 +74,10 @@ export class UserService {
 
     if (!user) {
       throw new NotFoundError('Không tìm thấy người dùng');
+    }
+
+    if (!user.qrCode) {
+      user.qrCode = await this.ensureQrCode(user.id, user.role, user.qrCode);
     }
 
     return user;

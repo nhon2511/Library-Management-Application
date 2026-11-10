@@ -243,9 +243,17 @@ function BookModal({
       categoryId: String(f.get('categoryId')),
       description: String(f.get('description') || ''),
     };
+    const coverImage = f.get('coverImage');
+    const payload = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined) payload.append(key, String(value));
+    });
+    if (coverImage instanceof File && coverImage.size > 0) {
+      payload.append('coverImage', coverImage);
+    }
     try {
-      if (book) await api.patch(`/books/${book.id}`, data);
-      else await api.post('/books', data);
+      if (book) await api.patch(`/books/${book.id}`, payload);
+      else await api.post('/books', payload);
       onSaved();
     } catch (e: any) {
       setError(e.response?.data?.message || 'Không lưu được đầu sách.');
@@ -298,6 +306,18 @@ function BookModal({
             defaultValue={book?.description}
           />
         </Field>
+        <Field
+          label="Bìa sách"
+          hint="JPEG, PNG hoặc WebP; tối đa 5MB. Để trống khi sửa nếu không muốn thay đổi bìa."
+        >
+          <Input name="coverImage" type="file" accept="image/jpeg,image/png,image/webp" />
+        </Field>
+        {book?.coverImageUrl && (
+          <div className="cover-preview">
+            <span>Bìa hiện tại</span>
+            <img src={book.coverImageUrl} alt={`Bìa hiện tại của ${book.title}`} />
+          </div>
+        )}
         <div className="modal-actions">
           <Button type="button" variant="ghost" onClick={onClose}>
             Hủy

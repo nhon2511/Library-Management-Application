@@ -84,6 +84,15 @@ export function AppShell() {
   );
 }
 export function PublicShell() {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const homePath = user?.role === 'READER' ? '/reader/dashboard' : '/operations';
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/catalog');
+  };
+
   return (
     <div className="public-shell">
       <header className="public-nav">
@@ -97,10 +106,22 @@ export function PublicShell() {
         </Link>
         <nav>
           <Link to="/catalog">Tra cứu sách</Link>
-          <Link to="/login">Đăng nhập</Link>
-          <Link to="/register" className="public-cta">
-            Tạo tài khoản
-          </Link>
+          {user ? (
+            <>
+              <Link to={homePath}>Không gian của tôi</Link>
+              <Link to="/profile">Hồ sơ</Link>
+              <button type="button" className="public-logout" onClick={handleSignOut}>
+                Đăng xuất
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">Đăng nhập</Link>
+              <Link to="/register" className="public-cta">
+                Tạo tài khoản
+              </Link>
+            </>
+          )}
         </nav>
       </header>
       <Outlet />

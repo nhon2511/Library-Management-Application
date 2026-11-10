@@ -50,6 +50,10 @@ export const uploadBookCover: RequestHandler = (
   res: Response,
   next: NextFunction,
 ): void => {
+  if (!hasCloudinaryConfig && req.headers['content-type']?.includes('multipart/form-data')) {
+    next(new BadRequestError('Chưa cấu hình Cloudinary để tải ảnh bìa sách lên'));
+    return;
+  }
   upload.single('coverImage')(req, res, (error: unknown) => {
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
       next(new BadRequestError('Ảnh bìa không được vượt quá 5MB'));
