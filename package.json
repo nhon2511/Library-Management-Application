@@ -8,6 +8,7 @@
     "build": "tsc",
     "test": "jest --runInBand --detectOpenHandles --forceExit",
     "start": "node dist/server.js",
+    "jobs:run": "node dist/jobs/run-scheduled.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"prisma/**/*.ts\" \"tests/**/*.ts\"",

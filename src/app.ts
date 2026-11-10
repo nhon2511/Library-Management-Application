@@ -23,6 +23,7 @@ import auditLogRoutes from './modules/audit-log/audit-log.routes';
 import systemSettingRoutes from './modules/system-setting/system-setting.routes';
 
 const app: Application = appExpress();
+app.set('trust proxy', config.trustProxyHops);
 
 function appExpress(): Application {
   return express();

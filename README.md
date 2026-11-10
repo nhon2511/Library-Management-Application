@@ -79,3 +79,12 @@ Test integration ghi dữ liệu fixture rồi dọn dẹp. Tạo database `libr
 - ADMIN: `/api/v1/system-settings`, `/api/v1/audit-logs`.
 
 Xem `src/modules/*/*.routes.ts` để biết method, validation và quyền truy cập chính xác.
+
+## Triển khai Render + Vercel
+
+1. Trên Render, tạo Blueprint từ `render.yaml`. Blueprint tạo web service miễn phí và một cron service **có tính phí** chạy mỗi 15 phút. Nhập `DATABASE_URL` của Neon và cấu hình SMTP cho cả hai service khi được hỏi. Đặt `CORS_ORIGIN` của web service bằng đúng origin HTTPS của Vercel (không có dấu `/` cuối). Web service chạy `db:deploy` trước khi khởi động; cron service xử lý đặt mượn hết hạn, phiếu quá hạn, phiên refresh hết hạn và email nhắc hạn. `TRUST_PROXY_HOPS=1` trên Render giúp rate limit dùng IP người dùng sau proxy. Không chạy `db:seed` trên production.
+2. Trên Vercel, tạo project từ repository với **Root Directory = `frontend`**, Build Command = `npm run build`, Output Directory = `dist`. Đặt `VITE_API_URL=https://<render-web-domain>/api/v1` trong Environment Variables rồi deploy. Giá trị này được đóng vào bundle tại thời điểm build, nên phải redeploy sau khi đổi. `frontend/vercel.json` chuyển các đường dẫn SPA như `/profile` về `index.html`.
+3. Sau khi có URL Vercel thật, cập nhật `CORS_ORIGIN` trên Render và redeploy web service. Nếu dùng hai domain mặc định `vercel.app` và `onrender.com`, refresh cookie production dùng `SameSite=None; Secure`; một số trình duyệt chặn cookie bên thứ ba. Để phiên đăng nhập ổn định hơn, dùng hai subdomain HTTPS cùng một site, ví dụ `app.example.com` và `api.example.com`, rồi đặt `COOKIE_SAME_SITE=strict` trên Render.
+4. Kiểm tra `/healthz`, đăng ký/đăng nhập, refresh sau khi access token hết hạn, tải trực tiếp `/profile`, upload bìa (nếu đã thêm Cloudinary), và một lần chạy cron trong Render. Nếu dùng database Neon hiện tại, migration đã được baseline và áp dụng; với database khác đã có bảng nhưng chưa có lịch sử Prisma Migrate, làm theo mục **Migration và seed** trước khi khởi động.
+
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` bắt buộc khi `NODE_ENV=production`. Nếu dùng cổng 465 với TLS trực tiếp, đặt `SMTP_SECURE=true` trên cả web service và cron service. Cloudinary là tùy chọn; muốn upload ảnh bìa thì thêm ba biến `CLOUDINARY_*` từ `.env.example` vào web service. Tài khoản ADMIN phải được tạo/cấp quyền trước khi sử dụng trang quản trị; seed mẫu không chạy trong production.

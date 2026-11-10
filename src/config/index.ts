@@ -19,6 +19,15 @@ export function validateEnv(): void {
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
+  if (process.env.COOKIE_SAME_SITE && !['strict', 'none'].includes(process.env.COOKIE_SAME_SITE)) {
+    throw new Error('COOKIE_SAME_SITE must be strict or none');
+  }
+  if (
+    process.env.TRUST_PROXY_HOPS &&
+    (!/^\d+$/.test(process.env.TRUST_PROXY_HOPS) || Number(process.env.TRUST_PROXY_HOPS) > 10)
+  ) {
+    throw new Error('TRUST_PROXY_HOPS must be an integer between 0 and 10');
+  }
 }
 
 validateEnv();
@@ -43,6 +52,10 @@ export const config = {
 
   // CORS
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  cookieSameSite: (process.env.COOKIE_SAME_SITE ||
+    (process.env.NODE_ENV === 'production' ? 'none' : 'strict')) as 'strict' | 'none',
+  runInProcessJobs: process.env.RUN_IN_PROCESS_JOBS !== 'false',
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS || '0'),
 
   // Rate Limiting
   rateLimit: {

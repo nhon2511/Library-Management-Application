@@ -11,14 +11,19 @@ import {
 } from './jobs/refresh-session-cleanup.job';
 
 validateEnv();
+if (config.isProd && !/^https:\/\/[^/]+$/.test(config.corsOrigin)) {
+  throw new Error('CORS_ORIGIN must be an HTTPS origin without a trailing slash in production');
+}
 
 const server = app.listen(config.port, () => {
   logger.info(`Server đang chạy trên port ${config.port} ở chế độ ${config.nodeEnv}`);
-  reservationCleanupJob.start();
-  overdueCheckJob.start();
-  dueSoonReminderJob.start();
-  refreshSessionCleanupJob.start();
-  logger.info('Đã khởi chạy các cron job tự động.');
+  if (config.runInProcessJobs) {
+    reservationCleanupJob.start();
+    overdueCheckJob.start();
+    dueSoonReminderJob.start();
+    refreshSessionCleanupJob.start();
+    logger.info('Đã khởi chạy các cron job tự động.');
+  }
 });
 
 // Graceful Shutdown

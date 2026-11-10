@@ -11,7 +11,7 @@ function setRefreshCookie(res: Response, token: string): void {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: config.isProd,
-    sameSite: 'strict',
+    sameSite: config.cookieSameSite,
     maxAge,
   });
 }
@@ -37,6 +37,11 @@ export class AuthController {
   refresh = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const token = req.cookies?.refreshToken || req.body?.refreshToken;
 
+    if (config.isProd && req.cookies?.refreshToken && req.headers.origin !== config.corsOrigin) {
+      ApiResponse.error(res, 'Nguồn yêu cầu không hợp lệ', 403);
+      return;
+    }
+
     if (typeof token !== 'string' || token.length === 0 || token.length > 4096) {
       ApiResponse.error(res, 'Refresh token không được cung cấp', 401);
       return;
@@ -54,7 +59,7 @@ export class AuthController {
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: config.isProd,
-      sameSite: 'strict',
+      sameSite: config.cookieSameSite,
     });
     ApiResponse.success(res, null, 'Đăng xuất thành công');
   });
